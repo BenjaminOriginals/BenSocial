@@ -47,10 +47,10 @@ select tst.eq((select string_agg(p.oid::regprocedure::text, ', ' order by 1)
 select tst.eq((select string_agg(p.proname, ', ' order by p.proname)
                  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                 where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')),
-              'ads_enabled, back_post, claim_daily_drop, delete_my_account, feed, handle_available, handle_reserved, '
+              'ads_enabled, app_switches, back_post, claim_daily_drop, delete_my_account, feed, handle_available, handle_reserved, '
               'is_admin, is_blocked_with, list_duels, mark_notifications_read, mod_create_duel, mod_open_reports, '
               'mod_reset_profile, mod_resolve_report, mod_set_banned, mod_set_post_removed, mod_set_reply_removed, '
-              'my_profile, my_stats, posts_by, record_ad_view, search_people, sell_position, '
+              'mod_set_switch, my_profile, my_stats, posts_by, record_ad_view, search_people, sell_position, '
               'settle_duels, touch_streak, unread_count, vote_duel',
               'authenticated can execute exactly the RPCs and policy helpers');
 
@@ -89,7 +89,8 @@ select tst.eq((select string_agg(p.proname, ', ')
                                     'vote_duel', 'settle_duels', 'mark_notifications_read', 'unread_count', 'my_stats',
                                     'delete_my_account', 'record_ad_view', 'mod_open_reports', 'mod_set_post_removed',
                                     'mod_set_banned', 'mod_resolve_report', 'mod_create_duel', 'my_profile',
-                                    'mod_set_reply_removed', 'mod_reset_profile', 'handle_reserved', 'ads_enabled')
+                                    'mod_set_reply_removed', 'mod_reset_profile', 'handle_reserved', 'ads_enabled',
+                                    'app_switches', 'mod_set_switch')
                   and not p.prosecdef),
               null::text, 'RPCs that write or read private data are SECURITY DEFINER');
 select tst.eq((select string_agg(p.proname, ', ' order by p.proname)

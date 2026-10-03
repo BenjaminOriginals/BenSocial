@@ -498,6 +498,11 @@ body[data-gate] .skip,body[data-gate] .ticker,body[data-gate] .topbar,body[data-
 .mod-meta{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:13px;color:var(--muted)}
 .mod-content{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);border-radius:10px;padding:10px 12px;font-size:14.5px}
 .mod-actions{display:flex;gap:6px;flex-wrap:wrap}
+.switch-row{border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.panel-head+p+.switch-row{border-top:0;padding-top:0}
+.switch-head{display:flex;align-items:center;gap:10px}
+.switch-name{font-size:16px;font-weight:650}
+.switch-row>.row{justify-content:flex-start}
 .duel-side{border:1px solid var(--line);border-radius:12px;padding:12px;margin:0;display:flex;flex-direction:column;gap:10px;min-width:0}
 .duel-side legend{font-weight:650;font-size:13.5px;padding:0 4px;color:var(--fg)}
 
@@ -575,7 +580,12 @@ body[data-gate] .skip,body[data-gate] .ticker,body[data-gate] .topbar,body[data-
 <script>
 /* =====================================================================
    BENSOCIAL SWITCHBOARD
-   Monetization is built and parked. Flip a switch to true to turn it on.
+   Monetization is built and parked. One switch per feature.
+   Demo mode (BACKEND below left empty) reads these two: set one to true
+   to turn that feature on in the demo.
+   Live mode ignores these and reads the same two switches from your
+   database instead: Moderation -> Switchboard in the app, or one SQL line
+   (update public.settings set ads_enabled = true;). See docs/GO-LIVE.md.
    ===================================================================== */
 const SWITCHES = {
   ads: false,       // Ads in the feed, attention price, ad earnings for users.
@@ -609,7 +619,23 @@ const LIVE = Boolean(BACKEND.supabaseUrl && BACKEND.supabaseKey);
 (() => {
 'use strict';
 
-const ADS_ON = SWITCHES.ads, PAY_ON = SWITCHES.payments, WALLET_ON = ADS_ON || PAY_ON;
+// Which monetization features are on. Demo mode: SWITCHES above. Live mode: the database (public.settings), never
+// SWITCHES. Much of the app is built from these as the page loads, so live mode starts from the switches this browser
+// saw last time (SWITCH_KEY, off if none), checks the server's before the app shows, and reloads once if they changed.
+// That reload carries the server's switches in history.state (RELOAD_KEY), so the reloaded page starts from them even
+// when storage hasn't caught up with the write made just before the reload, or doesn't keep it at all.
+const SWITCH_KEY = 'bensocial.live.switches', RELOAD_KEY = 'bensocial.live.switches.reload';
+const asSwitches = s => ({ ads: !!s && s.ads === true, payments: !!s && s.payments === true });
+function storedSwitches() {
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(SWITCH_KEY)); } catch (e) { /* unreadable: everything stays off */ }
+  return asSwitches(s);
+}
+function carriedSwitches() {
+  try { const j = history.state && history.state[RELOAD_KEY]; return typeof j === 'string' ? asSwitches(JSON.parse(j)) : null; } catch (e) { return null; }
+}
+const ON = LIVE ? carriedSwitches() || storedSwitches() : { ads: !!SWITCHES.ads, payments: !!SWITCHES.payments };
+const ADS_ON = ON.ads, PAY_ON = ON.payments, WALLET_ON = ADS_ON || PAY_ON;
 
 /* ---------- helpers ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -761,7 +787,7 @@ const BADGES = [
   { id: 'streak3', name: 'On a roll', desc: 'Reach a 3-day streak', test: () => S.me.streak >= 3, live: () => S.me.streak >= 3 },
 ];
 // Anything tagged `needs: 'ads' | 'payments'` exists only while that switch is on.
-const switchedOn = x => !x.needs || SWITCHES[x.needs];
+const switchedOn = x => !x.needs || ON[x.needs];
 // Notes and ledger lines carry k: 'ad' | 'pay' so they hide again if a switch is turned back off.
 const kindOn = n => n.k == null || (n.k === 'ad' ? ADS_ON : PAY_ON);
 const BADGE_LIST = BADGES.filter(switchedOn);
@@ -774,7 +800,7 @@ const HANDLE_RE = /^[a-z0-9._]{3,20}$/;
 
 const AD_SHARE = 0.7, TIP_FEE = 0.08, HIST = 40, TICK_MS = 3500, KEY = 'bensocial.v2';
 const LIVE_KEY = 'bensocial.live.v1', POLL_MS = 30000;
-// Live mode with payments on, but no payment processor connected yet (see docs/GO-LIVE.md, "Before flipping payments").
+// Live mode with payments on, but no payment processor connected yet (see docs/GO-LIVE.md, "Before turning payments on").
 const PAY_MSG = "Payments aren't available yet.";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Live mode: the Supabase client, who is signed in, and caches filled from the backend.
@@ -888,7 +914,8 @@ function save() { clearTimeout(saveTimer); saveTimer = setTimeout(writeStore, 30
 const UI = { why: new Set(), open: new Set(), pop: null, editing: null, mood: null, incoming: [], seenAds: new Set(), rank: new Map(), resetArmed: false, editProfile: false, lastFocus: null,
   menu: null, confirm: null, person: null, from: null, reportDraft: null,
   // Live mode only.
-  personState: null, personPosts: null, mod: null, adZero: new Set(), handleCheck: null, confirmAccount: false, authTab: 'signin', notesLoading: false, quiet: false, people: null };
+  personState: null, personPosts: null, mod: null, adZero: new Set(), handleCheck: null, confirmAccount: false, authTab: 'signin', notesLoading: false, quiet: false, people: null,
+  switchAsk: null };
 
 /* ---------- derived ---------- */
 const meUser = () => ({ name: S.me.name, handle: S.me.handle, hue: S.me.hue, bio: S.me.bio, followers: S.me.followers, following: S.follows.length });
@@ -912,7 +939,7 @@ const postById = id => LIVE ? POSTS.get(String(id)) : S.posts.find(p => p.id ===
 const editCount = p => LIVE ? p.editCount : p.edits.length;
 const adList = () => LIVE ? S.ads : ADS;
 const walletBalance = () => LIVE ? S.me.earned : PAY_ON ? S.me.cash : S.me.earned; // Live mode has no balance until payments exist.
-const isAdmin = () => LIVE && S.me.admin;
+const isAdmin = () => LIVE && S.me.admin && !S.me.banned; // A banned admin loses moderation, as on the server.
 const isPro = () => PAY_ON && S.me.pro;
 const SELL_LABEL = PAY_ON ? 'Cash out' : 'Sell'; // "Cash out" reads as money, so it waits for payments.
 const nameBtn = (by, inner) => `<button class="name-btn" data-act="person" data-id="${esc(by)}">${inner}</button>`;
@@ -1135,6 +1162,7 @@ const ERRORS = {
   blocked: "You can't do that. One of you has blocked the other.",
   not_allowed: "You can't ban yourself.",
   bad_status: "That isn't a valid report status.",
+  bad_switch: "That switch can't be changed here. See docs/GO-LIVE.md.",
   ads_off: "Ads aren't running right now.",
   edit_limit: 'This post has been edited 50 times, the most it can be. Write a new post instead.',
   name_reserved: "Names can't include BenSocial. Pick another name.",
@@ -1418,6 +1446,17 @@ async function loadEdits(id) {
   const rows = await call(sb.from('post_edits').select('body, written_at').eq('post_id', Number(id)).order('written_at', { ascending: true })) || [];
   p.edits = rows.map(r => ({ text: String(r.body ?? ''), at: Date.parse(r.written_at) }));
   p.editsLoaded = true;
+}
+// The Switchboard shows the server's switches. Opening Moderation (or Refresh) reads them again.
+async function loadSwitches() {
+  try { const sw = readSw(await rpc('app_switches')); if (sw) noteSwitches(sw); }
+  catch (e) { console.warn('app_switches failed', e); }
+  renderSwitchboard();
+}
+function renderSwitchboard() {
+  if (phase !== 'app' || S.view !== 'moderation') return;
+  const el = $('#switchboardPanel');
+  if (el) keepFocus(el, () => { el.innerHTML = switchboardHTML(); });
 }
 async function loadReports() {
   UI.mod = { rows: UI.mod ? UI.mod.rows : [], loading: true };
@@ -1983,7 +2022,8 @@ const VIEWS = {
           <label>Runs for (hours)<input class="field" id="duel-hours" name="hours" type="number" inputmode="numeric" min="1" max="72" step="1" value="24" required></label>
           <div class="row" style="grid-column:1/-1"><button class="btn sm">Create duel</button></div>
         </form>
-      </section>`;
+      </section>
+      <section class="panel" id="switchboardPanel" aria-labelledby="switchboardTitle">${switchboardHTML()}</section>`;
   },
 };
 
@@ -2071,6 +2111,35 @@ function modItemHTML(r) {
       ${btn('modResolve', r.report_id, 'actioned', 'Mark actioned')}
     </div>
   </article>`;
+}
+
+// Live mode, admins only: the monetization switches in public.settings, which decide for everyone. Ads turn on and
+// off here, in two steps. Payments have no button: they need a payment processor first (docs/GO-LIVE.md).
+function switchboardHTML() {
+  const sw = SERVER_SW, ask = UI.switchAsk;
+  const head = `<div class="panel-head"><h2 class="h2" id="switchboardTitle">Switchboard</h2><span class="fine">Applies to everyone</span></div>
+    <p class="muted small">Ads and payments are built and parked. A change reaches each person the next time they open BenSocial.</p>`;
+  if (!sw) return head + `<p class="note-box">Couldn't read the switches from the database. If BenSocial was set up before the Switchboard existed, run supabase/schema.sql again in the Supabase SQL editor (docs/GO-LIVE.md, step 1), then press Refresh.</p>`;
+  const pill = on => `<span class="status ${on ? 'ok' : 'no'}">${on ? 'On' : 'Off'}</span>`;
+  const changed = k => sw[k] !== ON[k] ? '<p class="fine">Changed since this page opened. Reload to see it here.</p>' : '';
+  const count = !ask || !ask.on || ask.active == null ? ''
+    : ask.active ? ` The ads table has ${fmt(ask.active)} active ${plural(ask.active, 'ad')} right now.`
+    : ' The ads table has no active ads yet, so nobody sees one until you add some (docs/GO-LIVE.md).';
+  return head + `
+    <div class="switch-row" data-switch="ads">
+      <div class="switch-head"><h3 class="switch-name">Ads</h3>${pill(sw.ads)}</div>
+      <p class="small">${sw.ads ? 'On: active ads show in feeds and pay people 70% of their bid.' : 'Off: nobody sees an ad, and no ad pays.'}</p>${changed('ads')}
+      <div class="row"><button class="btn ghost sm" data-act="askSwitch" data-arg="${sw.ads ? '0' : '1'}" aria-expanded="${!!ask}">Turn ads ${sw.ads ? 'off' : 'on'}</button></div>
+      ${ask ? `<div class="confirm" role="group" aria-label="Turn ads ${ask.on ? 'on' : 'off'}">
+        <p><b>Turn ads ${ask.on ? 'on' : 'off'} for everyone?</b> ${ask.on ? `Active ads in the ads table start showing in feeds and paying people 70% of their bid.${count}`
+          : 'No ad shows or pays from now on. Earnings people already have stay.'} Each person gets the change the next time they open BenSocial.</p>
+        <div class="row"><button class="btn ghost sm" data-act="cancelSwitch">Cancel</button><button class="btn sm" data-act="setSwitch" data-arg="${ask.on ? '1' : '0'}">Turn ads ${ask.on ? 'on' : 'off'}</button></div>
+      </div>` : ''}
+    </div>
+    <div class="switch-row" data-switch="payments">
+      <div class="switch-head"><h3 class="switch-name">Payments</h3>${pill(sw.payments)}</div>
+      <p class="small">${sw.payments ? "On, but no payment processor is connected, so money buttons say payments aren't available yet." : 'Off: no tips, top-ups, cash-out or Pro.'} Payments need a payment processor first. See docs/GO-LIVE.md.</p>${changed('payments')}
+    </div>`;
 }
 
 function accountHTML() {
@@ -2297,6 +2366,8 @@ function observeAds() {
       if (UI.seenAds.has(id)) continue;
       const a = adList().find(x => x.id === id);
       if (!a || a.bid < S.adPrice) continue;
+      // The 30s poll saw ads turned off on the server since this page loaded. Drop them quietly, as below.
+      if (LIVE && !adsServed()) { S.ads = []; renderFeed(); console.warn('ads are off on the server'); return; }
       UI.seenAds.add(id);
       after(api.creditAd(a), pay => { // Live mode waits for record_ad_view; demo credits right away.
         $$(`[data-ad="${CSS.escape(id)}"] .ad-pay`).forEach(el => { el.classList.add('paid'); el.innerHTML = ic('check', 13) + (pay > 0 ? ' Paid you ' + cents(pay) : ' Already paid today'); });
@@ -2521,7 +2592,7 @@ async function openHandle(h) {
 }
 function go(v) {
   if (!canView(v)) v = 'feed';
-  S.view = v; UI.pop = null; UI.confirm = null; UI.confirmAccount = false; closeMenu();
+  S.view = v; UI.pop = null; UI.confirm = null; UI.confirmAccount = false; UI.switchAsk = null; closeMenu();
   if (LIVE && v === 'activity') UI.notesLoading = true; // Read the list before marking it read.
   try { history.replaceState(null, '', '#' + hashFor(v)); } catch (e) { /* sandboxed */ }
   render(true);
@@ -2533,7 +2604,7 @@ function go(v) {
 function enterView(v) {
   const again = name => () => { if (S.view === name) render(); };
   if (v === 'activity') loadNotes().then(again('activity'), e => { failed(e); again('activity')(); });
-  else if (v === 'moderation') loadReports();
+  else if (v === 'moderation') { loadReports(); loadSwitches(); }
   else if (v === 'people') searchPeople(UI.people ? UI.people.q : '');
   else if (v === 'duels') loadDuels().then(() => { again('duels')(); renderTicker(); renderLive(); }, e => console.warn('duels refresh failed', e));
   else if (v === 'person' && UI.person) loadPerson(UI.person);
@@ -2846,7 +2917,33 @@ const ACTIONS = {
     el.classList.add('flash');
     const t = kind === 'reply' ? $(`#reply-${CSS.escape(id)}`) : $('[data-act="menu"]', el); if (t) t.focus({ preventScroll: true });
   },
-  modRefresh: () => loadReports(),
+  modRefresh: () => { loadSwitches(); return loadReports(); },
+  // The Switchboard (admins). Step one shows what turning ads on or off does; step two calls mod_set_switch().
+  askSwitch: async (_, on) => {
+    if (UI.switchAsk) { ACTIONS.cancelSwitch(); return; }
+    let active = null; // How many ads would start showing. Only a hint, so a failed count is left out.
+    if (on === '1') { try { active = (await call(sb.from('ads').select('id').eq('active', true)) || []).length; } catch (e) { console.warn(e); } }
+    if (phase !== 'app' || S.view !== 'moderation') return;
+    UI.switchAsk = { on: on === '1', active };
+    renderSwitchboard();
+    const b = $('#switchboardPanel [data-act="cancelSwitch"]'); if (b) b.focus();
+  },
+  cancelSwitch: () => { UI.switchAsk = null; renderSwitchboard(); const b = $('#switchboardPanel [data-act="askSwitch"]'); if (b) b.focus(); },
+  setSwitch: async (_, on, el) => {
+    busy(el, true);
+    let sw;
+    try { sw = readSw(await rpc('mod_set_switch', { p_name: 'ads', p_on: on === '1' })); }
+    catch (e) { busy(el, false); throw e; }
+    UI.switchAsk = null;
+    if (!sw) { await loadSwitches(); return; }
+    SERVER_SW = sw;
+    const msg = sw.ads ? 'Ads are on. Each person gets them the next time they open BenSocial.' : 'Ads are off. No ad shows or pays from now on.';
+    // Reload this page so it runs with the new switches too. If this browser can't remember them, stay put instead.
+    if (!storeSwitches(sw)) { renderSwitchboard(); toast(msg); return; }
+    try { sessionStorage.setItem(NOTICE_KEY, msg); } catch (e) { /* the reload still applies it */ }
+    clearTimeout(saveTimer); writeStore(); // Keep the view and any draft across the reload.
+    reloadWith(sw);
+  },
   modRemove: async (id, on) => {
     await rpc('mod_set_post_removed', { p_post: Number(id), p_removed: on === '1' });
     toast(on === '1' ? 'Post removed. Its author was told.' : 'Post restored.');
@@ -2912,6 +3009,7 @@ document.addEventListener('keydown', e => {
     else if (UI.menu) closeMenu(true);
     else if (UI.confirm) ACTIONS.cancelDelete();
     else if (UI.confirmAccount) ACTIONS.cancelDeleteAccount();
+    else if (UI.switchAsk) ACTIONS.cancelSwitch();
     else if (UI.pop) { const id = UI.pop.id; UI.pop = null; rerenderPost(id); }
     else if (UI.editing) ACTIONS.cancelEdit();
   }
@@ -3139,6 +3237,53 @@ let RECOVERY = LIVE && /type=recovery/.test(location.hash + location.search);
 const LINK_ERROR = LIVE && /error_description=|error_code=/.test(location.hash + location.search);
 let SESSION = null, clientScript = null, liveTimer = null, lastPoll = 0, AUTH_NOTE = '', handleTimer = null;
 let WANT_HANDLE = ''; // The handle asked for at sign-up. If it was taken meanwhile, the app says which one you got.
+
+// The monetization switches. ON (top of the script) is what this page was built with. SERVER_SW is the database's,
+// from app_switches(): read at sign-in, every 30s, and when Moderation opens. Null until read.
+let SERVER_SW = null;
+const NOTICE_KEY = 'bensocial.live.notice';
+const readSw = r => r && typeof r === 'object' && typeof r.ads === 'boolean' && typeof r.payments === 'boolean' ? { ads: r.ads, payments: r.payments } : null;
+const sameSw = (a, b) => a.ads === b.ads && a.payments === b.payments;
+// Remembers the switches for the next page load. False if this browser can't keep them.
+function storeSwitches(sw) {
+  try { const json = JSON.stringify(sw); localStorage.setItem(SWITCH_KEY, json); return localStorage.getItem(SWITCH_KEY) === json; }
+  catch (e) { return false; }
+}
+// Reloads this page to run with these switches, carrying them across in history.state (see ON at the top).
+function reloadWith(sw) {
+  try { history.replaceState(Object.assign({}, history.state, { [RELOAD_KEY]: JSON.stringify(sw) }), ''); } catch (e) { /* storage has them */ }
+  phase = 'reload';
+  location.reload();
+}
+// Before the app shows: if the server's switches differ from the ones this page was built with, remember them and
+// reload once, so the whole app follows them. Never twice in a row for the same switches (storage that doesn't keep
+// them would loop): the app then carries on, and the server still refuses whatever it has switched off.
+// True when a reload is on its way.
+function reloadForSwitches() {
+  const sw = SERVER_SW;
+  if (!sw) return false; // Couldn't read them. Keep what this page has.
+  if (sameSw(sw, ON)) { try { sessionStorage.removeItem(RELOAD_KEY); } catch (e) { /* nothing to clear */ } return false; }
+  const json = JSON.stringify(sw);
+  let tried = true;
+  try { tried = sessionStorage.getItem(RELOAD_KEY) === json; } catch (e) { /* can't tell, so don't risk a loop */ }
+  const stored = storeSwitches(sw);
+  if (tried || !stored) { console.warn('BenSocial: the monetization switches changed, but this browser could not reload with them.'); return false; }
+  try { sessionStorage.setItem(RELOAD_KEY, json); } catch (e) { return false; }
+  reloadWith(sw);
+  return true;
+}
+// The 30s poll and the Switchboard: remember a change for the next time this browser opens BenSocial. A page in use
+// never reloads for it.
+function noteSwitches(sw) {
+  const was = SERVER_SW;
+  SERVER_SW = sw;
+  if (!sameSw(sw, storedSwitches())) storeSwitches(sw);
+  if (was && sameSw(was, sw)) return;
+  if (UI.switchAsk && UI.switchAsk.on === sw.ads) UI.switchAsk = null; // Already done elsewhere.
+  renderSwitchboard();
+}
+// Ads load only while this page shows them and the server runs them.
+const adsServed = () => ADS_ON && (!SERVER_SW || SERVER_SW.ads);
 const HANDLE_HELP = 'Handles are 3 to 20 characters: lowercase letters, numbers, dots and underscores.';
 const logoHTML = '<h1 class="logo">Ben<mark>Social</mark></h1>';
 
@@ -3395,11 +3540,15 @@ async function bootLive(session) {
   if (phase !== 'boot') return; // Signed out while loading.
   if (RECOVERY) showRecovery();
   else if (!ok) showFinish();
-  else enterApp();
+  else if (!reloadForSwitches()) enterApp(); // A reload keeps "Loading your feed…" up until the page comes back.
 }
 // Everything the app needs after sign-in, in parallel. touch_streak() runs first so the profile includes today.
 async function loadEverything() {
   const streak = rpc('touch_streak', { p_today: dayKey() }).catch(e => { console.warn('touch_streak failed', e); return null; });
+  // The switches decide whether this page may stay as it is (bootLive), and whether ads load at all.
+  const switches = rpc('app_switches').then(readSw, e => { console.warn('app_switches failed', e); return null; })
+    .then(sw => { SERVER_SW = sw; return sw; });
+  const ifAds = q => switches.then(() => adsServed() ? call(q()) : []);
   const [st, prof, follows, mutes, blocks, , positions, , unreadN, stats, ads, views] = await Promise.all([
     streak,
     streak.then(() => rpc('my_profile')), // Other people's profiles show only public columns; your own comes from here.
@@ -3409,10 +3558,11 @@ async function loadEverything() {
     loadFeed(),
     call(sb.from('positions').select('post_id, shares, cost').eq('user_id', MY_ID)),
     loadDuels(),
-    rpc('unread_count'),
-    rpc('my_stats'),
-    ADS_ON ? call(sb.from('ads').select('id, brand, hue, bid_cents, copy, why').eq('active', true)) : [],
-    ADS_ON ? call(sb.from('ad_views').select('ad_id, day, earned_cents').eq('user_id', MY_ID).order('day', { ascending: false }).limit(50)) : [],
+    // These two need the profile row, which touch_streak() rebuilds if it is missing (not_found otherwise).
+    streak.then(() => rpc('unread_count')),
+    streak.then(() => rpc('my_stats')),
+    ifAds(() => sb.from('ads').select('id, brand, hue, bid_cents, copy, why').eq('active', true)),
+    ifAds(() => sb.from('ad_views').select('ad_id, day, earned_cents').eq('user_id', MY_ID).order('day', { ascending: false }).limit(50)),
   ]);
   if (!prof) return false;
   applyProfile(prof, true);
@@ -3447,6 +3597,9 @@ function enterApp() {
   buildShell(); render(true); renderTicker(); renderChrome(); save(); // Focus moves into the app, off the sign-in form that just went away.
   if (WANT_HANDLE && S.me.handle && S.me.handle !== WANT_HANDLE) toast(`@${esc(WANT_HANDLE)} was taken, so your handle is @${esc(S.me.handle)}. You can change it in Profile.`);
   WANT_HANDLE = '';
+  let notice = ''; // Left by the Switchboard just before it reloaded this page.
+  try { notice = sessionStorage.getItem(NOTICE_KEY) || ''; sessionStorage.removeItem(NOTICE_KEY); } catch (e) { /* none */ }
+  if (notice) toast(esc(notice), { tone: 'accent' });
   if (S.view !== 'duels') enterView(S.view);
   if (start && start.handle) openHandle(start.handle);
   clearInterval(liveTimer); liveTimer = setInterval(liveTick, POLL_MS); lastPoll = Date.now();
@@ -3459,7 +3612,8 @@ function leaveApp() {
   PEOPLE.clear(); POSTS.clear(); MY_ID = ''; EMAIL = ''; UNREAD = 0; SESSION = null;
   S = blankLive();
   Object.assign(UI, { why: new Set(), open: new Set(), pop: null, editing: null, mood: null, incoming: [], seenAds: new Set(), adZero: new Set(), rank: new Map(),
-    editProfile: false, confirm: null, person: null, from: null, reportDraft: null, personState: null, personPosts: null, mod: null, handleCheck: null, confirmAccount: false, people: null });
+    editProfile: false, confirm: null, person: null, from: null, reportDraft: null, personState: null, personPosts: null, mod: null, handleCheck: null, confirmAccount: false, people: null,
+    switchAsk: null });
   WANT_HANDLE = ''; clearTimeout(peopleTimer);
   for (const sel of ['#rail', '#topbar', '#tabbar', '#view', '#live', '#ticker']) $(sel).innerHTML = '';
 }
@@ -3471,7 +3625,7 @@ async function signOut(note) {
   if (phase !== 'auth') { leaveApp(); showAuth(note, 'signin', 'ok'); }
   setTimeout(() => { AUTH_NOTE = ''; }, 0);
 }
-// Every 30s while the tab is visible: unread count, and whether the feed has newer posts.
+// Every 30s while the tab is visible: unread count, whether the feed has newer posts, and the monetization switches.
 function liveTick() {
   if (phase !== 'app' || document.visibilityState !== 'visible') return;
   patch(); renderLive(); renderTicker(); // Prices change with your own trades too.
@@ -3490,8 +3644,10 @@ async function touchToday() {
 async function poll() {
   lastPoll = Date.now();
   try {
-    const [n, rows] = await Promise.all([rpc('unread_count'), rpc('feed', { p_limit: 50 })]);
+    const [n, rows, sw] = await Promise.all([rpc('unread_count'), rpc('feed', { p_limit: 50 }),
+      rpc('app_switches').then(readSw, e => { console.warn('app_switches failed', e); return null; })]);
     if (phase !== 'app') return;
+    if (sw) noteSwitches(sw); // A change applies the next time this browser opens BenSocial.
     UNREAD = num(n);
     const have = new Set(S.posts.map(p => p.id)), newest = S.posts.reduce((m, p) => Math.max(m, p.at), 0);
     UI.incoming = (rows || []).filter(r => !have.has(String(r.id)) && !isMe(r.author_id) && Date.parse(r.created_at) > newest);

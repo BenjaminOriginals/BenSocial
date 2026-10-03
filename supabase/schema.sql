@@ -15,9 +15,12 @@
 --
 -- Monetization is held. public.settings has one switch per feature
 -- (ads_enabled, payments_enabled), both off, and nothing here turns one
--- on. While ads_enabled is off, no ad shows and no ad pays, whatever the
--- ads table says. Payments have no tables yet: no money moves until a
--- processor is connected (see docs/GO-LIVE.md).
+-- on. In live mode these are the only switches: the app reads them
+-- (app_switches()) and ignores SWITCHES in index.html. While ads_enabled
+-- is off, no ad shows and no ad pays, whatever the ads table says. Admins
+-- turn ads on and off in the app (Moderation -> Switchboard). Payments
+-- have no tables yet: no money moves until a processor is connected (see
+-- docs/GO-LIVE.md), so payments_enabled changes only in the SQL editor.
 --
 -- Security model (Supabase gives anon/authenticated ALL privileges on new
 -- objects by default):
@@ -238,10 +241,12 @@ create table if not exists public.ad_views (
   primary key (user_id, ad_id, day)
 );
 
--- The server side of the monetization switchboard. One row. These match
--- SWITCHES in index.html: the app decides what people see, and these decide
--- what the database pays for. Both start off. Turn one on in the SQL editor:
+-- The monetization switchboard for live mode. One row. The app reads these
+-- (app_switches()) to decide what people see, and the database checks them
+-- before it shows or pays anything. Both start off. Admins turn ads on and
+-- off in the app (Moderation -> Switchboard), or here in the SQL editor:
 --   update public.settings set ads_enabled = true;
+-- Each person gets the change the next time they open BenSocial.
 create table if not exists public.settings (
   id boolean primary key default true check (id),
   ads_enabled boolean not null default false,
@@ -435,7 +440,8 @@ begin
   if v_uid is null then
     raise exception 'not_authenticated';
   end if;
-  if not exists (select 1 from public.profiles p where p.id = v_uid and p.is_admin) then
+  -- A banned admin keeps the flag but loses every moderation power.
+  if not exists (select 1 from public.profiles p where p.id = v_uid and p.is_admin and not p.is_banned) then
     raise exception 'not_admin';
   end if;
   return v_uid;
@@ -704,7 +710,7 @@ returns boolean
 language sql stable security definer
 set search_path = public
 as $$
-  select coalesce((select p.is_admin from public.profiles p where p.id = auth.uid()), false)
+  select coalesce((select p.is_admin and not p.is_banned from public.profiles p where p.id = auth.uid()), false)
 $$;
 
 -- True when the caller and p_other have a block between them, either way.
@@ -1237,8 +1243,9 @@ create trigger reports_before_insert
 --   already_claimed, duel_closed, already_voted, bad_date, slow_down, banned,
 --   not_admin, bad_side, handle_taken, blocked
 -- plus not_allowed (admin tried to ban themselves), bad_status
--- (mod_resolve_report got an unknown status), ads_off (ads are switched off
--- in public.settings), edit_limit (a post already has 50 edits) and
+-- (mod_resolve_report got an unknown status), bad_switch (mod_set_switch got
+-- a switch it can't change), ads_off (ads are switched off in
+-- public.settings), edit_limit (a post already has 50 edits) and
 -- name_reserved (a name with "BenSocial" in it).
 -- =====================================================================
 
@@ -1699,6 +1706,17 @@ as $$
   select row_to_json(p) from public.profiles p where p.id = auth.uid()
 $$;
 
+-- The monetization switches (public.settings), for the app: {"ads": bool,
+-- "payments": bool}. The app reads them when it starts and every 30 seconds.
+-- They say only whether a feature is on.
+create or replace function public.app_switches()
+returns json
+language sql stable security definer
+set search_path = public
+as $$
+  select json_build_object('ads', public.ads_enabled(), 'payments', public.payments_enabled())
+$$;
+
 -- Find people by handle or name. An empty query lists the newest members.
 -- Skips you, banned accounts and anyone on either side of a block.
 create or replace function public.search_people(p_query text default '', p_limit int default 20)
@@ -1845,7 +1863,8 @@ as $$
 declare
   v_admin uuid := public.req_admin();
 begin
-  if p_user = v_admin and coalesce(p_banned, true) then
+  -- Admins can neither ban nor unban themselves.
+  if p_user = v_admin then
     raise exception 'not_allowed';
   end if;
   update public.profiles set is_banned = coalesce(p_banned, true) where id = p_user;
@@ -1962,6 +1981,28 @@ begin
           now(), now() + make_interval(hours => p_hours), v_admin)
   returning id into v_id;
   return v_id;
+end
+$$;
+
+-- The Switchboard in the Moderation view: turns ads on or off for everyone
+-- (public.settings.ads_enabled) and returns app_switches(). Ads are the only
+-- switch here. Payments need a payment processor first (docs/GO-LIVE.md), so
+-- payments_enabled changes only in the SQL editor: p_name 'payments', or
+-- anything else, raises bad_switch.
+create or replace function public.mod_set_switch(p_name text, p_on boolean)
+returns json
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  v_admin uuid := public.req_admin();
+begin
+  if p_name is distinct from 'ads' or p_on is null then
+    raise exception 'bad_switch';
+  end if;
+  insert into public.settings (id, ads_enabled) values (true, p_on)
+  on conflict (id) do update set ads_enabled = excluded.ads_enabled, updated_at = now();
+  return public.app_switches();
 end
 $$;
 
@@ -2270,6 +2311,7 @@ revoke execute on function
   public.my_stats(),
   public.delete_my_account(),
   public.my_profile(),
+  public.app_switches(),
   public.search_people(text, int),
   public.record_ad_view(bigint, date),
   public.mod_open_reports(),
@@ -2278,7 +2320,8 @@ revoke execute on function
   public.mod_reset_profile(uuid),
   public.mod_set_banned(uuid, boolean),
   public.mod_resolve_report(bigint, text),
-  public.mod_create_duel(text, text, text, text, text, int, text, text)
+  public.mod_create_duel(text, text, text, text, text, int, text, text),
+  public.mod_set_switch(text, boolean)
 from public, anon, authenticated;
 
 -- The only thing a signed-out visitor can call.
@@ -2305,6 +2348,7 @@ grant execute on function
   public.my_stats(),
   public.delete_my_account(),
   public.my_profile(),
+  public.app_switches(),
   public.search_people(text, int),
   public.record_ad_view(bigint, date),
   public.mod_open_reports(),
@@ -2313,7 +2357,8 @@ grant execute on function
   public.mod_reset_profile(uuid),
   public.mod_set_banned(uuid, boolean),
   public.mod_resolve_report(bigint, text),
-  public.mod_create_duel(text, text, text, text, text, int, text, text)
+  public.mod_create_duel(text, text, text, text, text, int, text, text),
+  public.mod_set_switch(text, boolean)
 to authenticated;
 
 

@@ -35,7 +35,7 @@ send email to that address yet" and can't create an account or reset a password.
    **Username** and **Password**. Press **Save**.
 3. Open **Authentication → Rate Limits**. The limit on emails sent per hour starts low (about 30). Raise it
    before you announce the app, or a burst of sign-ups will be told "Too many tries".
-4. Check it: sign up in the app (step 5) with an address that is not on your Supabase team. The
+4. Check it once the app is online (step 5): sign up with an address that is not on your Supabase team. The
    confirmation email should arrive within a minute.
 
 ### 4. Connect the app
@@ -68,6 +68,11 @@ Any static host with HTTPS works. The simplest is GitHub Pages:
 2. On GitHub: **Settings → Pages → Build and deployment → Deploy from a branch → main / (root)**.
 3. Your app appears at `https://<your-github-name>.github.io/BenSocial/` after a minute or two.
 
+GitHub Pages is free for public repositories. For a private repository it needs a paid GitHub plan. If you
+want to keep the repository private on a free plan, use Netlify or Cloudflare Pages instead: create a site,
+connect this repository, leave the build command empty, and publish the root folder. Then use that
+address in step 2.
+
 ### 6. Make yourself the admin
 1. Open your live app and create your account. Confirm it from the email.
 2. In Supabase **SQL Editor**, run this with the email you signed up with:
@@ -77,7 +82,8 @@ Any static host with HTTPS works. The simplest is GitHub Pages:
    ```
    It should say `UPDATE 1`. If it says `UPDATE 0`, check the spelling of the email.
 3. Reload the app. A **Moderation** item appears: in the menu on the left on a computer, and under
-   **Profile → Settings → Moderation** on a phone. It has the reports and a "Create duel" form.
+   **Profile → Settings → Moderation** on a phone. It has the reports, a "Create duel" form and the
+   **Switchboard** for ads and payments (see "The monetization switchboard" below).
 4. Handles like `bensocial`, `admin`, `support` and `moderator`, and names that contain "BenSocial", are
    reserved: nobody can pick them in the app. To give yourself one, run (with your email):
    ```sql
@@ -110,51 +116,61 @@ These are things code can't do for you:
 
 ## The monetization switchboard
 
-At the very top of the script in `index.html`:
+Ads and payments are fully built and parked. Each one has a single switch, and both start off. While a
+switch is off, nobody sees anything of that feature.
 
-```js
-const SWITCHES = {
-  ads: false,
-  payments: false,
-};
-```
+Where that switch is depends on the mode:
 
-Both are off. With a switch off, users see nothing of that feature anywhere.
+- **Demo mode**: the `SWITCHES` block at the very top of the script in `index.html`. Set `ads` or
+  `payments` to `true` to try that feature in the demo.
+  ```js
+  const SWITCHES = {
+    ads: false,
+    payments: false,
+  };
+  ```
+- **Live mode**: your database decides, and `SWITCHES` in `index.html` is ignored. Leave it as it is.
+  The two switches are in the `settings` table: `ads_enabled` and `payments_enabled`. You flip ads in
+  the app, under **Moderation → Switchboard**, or with one line in the Supabase **SQL Editor**. Payments
+  flip only in the SQL Editor (see "Before turning payments on" below). Because the switches live in your
+  database, nobody can turn a feature on from their own browser.
 
-In live mode the database has the same two switches, in `public.settings`: `ads_enabled` and
-`payments_enabled`. Both start off. The switch in `index.html` decides what people see. The one in the
-database decides what the server pays for, so nobody can collect ad money or Pro perks by calling the
-database directly while a feature is parked.
+A change in live mode reaches each person the next time they open BenSocial (or reload the page). A page
+someone already has open stays as it is until then.
 
 | Switch | In demo mode | In live mode |
 | --- | --- | --- |
-| `ads` | Simulated ads appear in the feed and pay simulated cents. | Ads come from the `ads` table (only rows with `active = true`), and only while `ads_enabled` is on. Each ad pays a user 70% of its bid at most once a day, and only if the bid meets their attention price. The money collects as earnings in the database. |
-| `payments` | Simulated tips, wallet top-ups, cash-out and Pro. | Buttons appear but say payments aren't available yet. Real money needs a payment processor (below). |
+| ads | Simulated ads appear in the feed and pay simulated cents. | Ads come from the `ads` table (only rows with `active = true`). Each ad pays a user 70% of its bid at most once a day, and only if the bid meets their attention price. The money collects as earnings in the database. |
+| payments | Simulated tips, wallet top-ups, cash-out and Pro. | Buttons appear but say payments aren't available yet. Real money needs a payment processor (below). |
 
 ### Turning ads on in live mode
-1. Add real ads to the `ads` table with `active = true`. Replace the example rows from `seed.sql`, which
-   stay inactive.
-2. Set `ads: true` in `SWITCHES` and publish it (steps 4 and 5). Nothing shows yet.
-3. In **SQL Editor**, run `update public.settings set ads_enabled = true;`. Ads appear and start paying.
+1. Add your real ads to the `ads` table with `active = true`: in Supabase, open **Table Editor → ads**.
+   The example rows from `seed.sql` are placeholders and stay inactive.
+2. Open BenSocial with your admin account and go to **Moderation**. Scroll down to **Switchboard**.
+3. Next to **Ads**, press **Turn ads on**. Read what it says, then press **Turn ads on** again to confirm.
 
-Users' earnings collect in the database. Paying them out needs `payments` too.
+That's the only switch. (Instead of steps 2 and 3, you can run this in the **SQL Editor**:
+`update public.settings set ads_enabled = true;`)
+
+Ads start paying right away, and each person sees them the next time they open BenSocial. Users'
+earnings collect in the database. Paying them out needs payments too.
 
 ### Parking ads again
-1. In **SQL Editor**, run `update public.settings set ads_enabled = false;`. This stops every ad and every
-   payout at once.
-2. Set `ads: false` in `SWITCHES` and publish it.
+In **Moderation → Switchboard**, press **Turn ads off**, then confirm. (Or run
+`update public.settings set ads_enabled = false;` in the **SQL Editor**.) This stops every ad and every
+payout at once. Earnings people already have stay.
 
-Always do step 1. The switch in `index.html` only hides ads in the app.
-
-### Before flipping `payments` in live mode
+### Before turning payments on in live mode
 Real money needs work that only makes sense once you've decided on the business model:
 - A Stripe account. Stripe Checkout handles Pro subscriptions and tips. Stripe Connect handles paying users.
 - Server code (Supabase Edge Functions) for checkout and Stripe webhooks, with Stripe keys stored as
   Supabase secrets.
 - Tax and payout reporting for users you pay.
 
-When that exists, run `update public.settings set payments_enabled = true;` as well. Until then the
-database gives no Pro perks (like the doubled daily drop), even to an account marked Pro.
+When that exists, turn payments on in the **SQL Editor**: `update public.settings set payments_enabled = true;`.
+The Switchboard shows whether payments are on, but has no button for them, so nobody can switch money on
+by accident. Until payments are on, the database gives no Pro perks (like the doubled daily drop), even to
+an account marked Pro.
 
 Tell me when you're ready and I'll build it.
 
@@ -173,4 +189,5 @@ Market is a game. If money goes in or out, it becomes gambling.
 | "Too many tries. Wait a few minutes" on sign-up | The email limit was reached. Raise it in **Authentication → Rate Limits** (step 3). |
 | A link in an email opens the wrong page or says it expired | Check **Site URL** and **Redirect URLs** (step 2). Links work once; ask for a new one. |
 | No Moderation item | Check that the SQL in step 6 said `UPDATE 1`, then reload the app. |
-| Ads don't show with `ads: true` | Check that the ad rows have `active = true` and that you ran step 3 of "Turning ads on". |
+| Ads don't show after you turned them on | Check that **Moderation → Switchboard** says Ads **On**, and that the ad rows have `active = true`. Each person gets the change the next time they open BenSocial. An ad also stays hidden from anyone whose attention price is above its bid. |
+| The Switchboard says it couldn't read the switches | Your database was set up before the Switchboard existed. Run all of `supabase/schema.sql` again (step 1). It keeps your data. |

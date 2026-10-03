@@ -9,7 +9,7 @@
 | **Demo** | `BACKEND` in `index.html` is empty (the default) | A simulated network that runs entirely in the browser. Good for showing the idea. |
 | **Live** | You paste your Supabase URL and publishable key into `BACKEND` | Real accounts, real posts and real people, stored in your own database. |
 
-To go live, follow **[docs/GO-LIVE.md](docs/GO-LIVE.md)**. It takes about 30 minutes.
+To go live, follow **[docs/GO-LIVE.md](docs/GO-LIVE.md)**. It takes about 45 minutes, most of it clicking through Supabase.
 
 ## What makes it different
 
@@ -22,28 +22,33 @@ To go live, follow **[docs/GO-LIVE.md](docs/GO-LIVE.md)**. It takes about 30 min
 
 ## Safety
 
-Each person has a profile page. The ⋯ menu on any post or person lets you report, mute or block. Settings has the Community Guidelines, your blocked accounts and account deletion. Admins get a **Moderation** view for reports, removals, bans and creating duels.
+Each person has a profile page. The ⋯ menu on any post or person lets you report, mute or block. Settings has the Community Guidelines, your blocked accounts and account deletion. Admins get a **Moderation** view for reports, removals, bans, creating duels and the monetization Switchboard.
 
 ## Monetization is parked
 
-Ads and payments are fully built but switched off. At the very top of the script in `index.html`:
+Ads and payments are fully built but switched off. Each has one switch:
 
-```js
-const SWITCHES = {
-  ads: false,       // Ads in the feed, attention price, ad earnings for users.
-  payments: false,  // Money: wallet top-up, tips, cash-out, BenSocial Pro.
-};
-```
+- **Demo mode** reads `SWITCHES` at the very top of the script in `index.html`:
+  ```js
+  const SWITCHES = {
+    ads: false,       // Ads in the feed, attention price, ad earnings for users.
+    payments: false,  // Money: wallet top-up, tips, cash-out, BenSocial Pro.
+  };
+  ```
+- **Live mode** ignores `SWITCHES` and reads the same two switches from your database. Admins flip ads
+  under **Moderation → Switchboard** in the app, or with one SQL line. Each person gets the change the next
+  time they open BenSocial.
 
-While a switch is `false`, nothing about that feature shows anywhere. Set it to `true` to turn it on. [docs/GO-LIVE.md](docs/GO-LIVE.md#the-monetization-switchboard) explains what each switch does, and what must exist before you flip one in live mode.
+While a switch is off, users see nothing of that feature. [docs/GO-LIVE.md](docs/GO-LIVE.md#the-monetization-switchboard) explains what each switch does, and what must exist before you turn one on in live mode.
 
 ## Repository
 
 | Path | What it is |
 | --- | --- |
-| `index.html` | The whole app: demo mode, live mode, the switchboard. |
+| `index.html` | The whole app: demo mode, live mode, and the demo's `SWITCHES`. |
 | `supabase/schema.sql` | The database: tables, security rules and server functions. Paste it into Supabase once. |
 | `supabase/seed.sql` | Optional starter duels and example ads. The ads are inactive. |
 | `docs/GO-LIVE.md` | The owner's go-live checklist. |
 | `tests/db/` | Database tests on a throwaway local PostgreSQL 16: `bash tests/db/run.sh` |
 | `tests/e2e/` | Live-mode browser tests against a local Supabase stand-in: `bash tests/e2e/run.sh` (see its README). |
+| `tests/demo/` | Browser tests with no database: demo mode, and live mode against a fake client: `bash tests/demo/run.sh` (see its README). |

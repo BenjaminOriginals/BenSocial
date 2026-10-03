@@ -108,7 +108,7 @@ begin
 
   perform tst.login('dave');
   perform tst.throws(format('select public.mod_set_banned(%L, true)', tst.uid('dave')), 'not_allowed', 'admins cannot ban themselves');
-  perform tst.lives(format('select public.mod_set_banned(%L, false)', tst.uid('dave')), 'unbanning yourself is a harmless no-op');
+  perform tst.throws(format('select public.mod_set_banned(%L, false)', tst.uid('dave')), 'not_allowed', 'admins cannot unban themselves either');
   perform tst.throws(format('select public.mod_set_banned(%L, true)', gen_random_uuid()), 'not_found', 'banning a missing user is not_found');
 
   -- Resolve
@@ -295,5 +295,40 @@ begin
   perform tst.login('carol');
   perform tst.ok(not exists (select 1 from public.posts where id = v), 'a member who was blocked still cannot');
   perform tst.ok(not exists (select 1 from public.replies where id = rid), 'nor read their replies');
+end $$;
+rollback;
+
+-- A banned admin loses every moderation power and cannot unban themselves.
+begin;
+do $$
+declare
+  v bigint;
+begin
+  update public.profiles set is_admin = true where handle = 'erin';
+  v := tst.post('alice', 'post for banned-admin checks');
+
+  perform tst.login('dave');
+  perform public.mod_set_banned(tst.uid('erin'), true);
+  perform tst.throws(format('select public.mod_set_banned(%L, false)', tst.uid('dave')), 'not_allowed',
+                     'an admin cannot unban themselves');
+
+  perform tst.login('erin');
+  perform tst.eq(public.is_admin(), false, 'is_admin() is false for a banned admin');
+  perform tst.throws(format('select public.mod_set_banned(%L, false)', tst.uid('erin')), 'not_admin',
+                     'a banned admin cannot unban themselves');
+  perform tst.throws('select * from public.mod_open_reports()', 'not_admin', 'a banned admin cannot list reports');
+  perform tst.throws(format('select public.mod_set_post_removed(%s, true)', v), 'not_admin',
+                     'a banned admin cannot remove posts');
+  perform tst.throws($q$select public.mod_set_switch('ads', true)$q$, 'not_admin',
+                     'a banned admin cannot flip the ads switch');
+  perform tst.throws($q$select public.mod_create_duel('t', 'a', 'a', 'b', 'b', 5)$q$, 'not_admin',
+                     'a banned admin cannot create duels');
+  perform tst.throws($q$insert into public.ads (brand, bid_cents, copy) values ('Sneaky', 5, 'buy')$q$, '42501',
+                     'a banned admin cannot create ads');
+
+  perform tst.login('dave');
+  perform public.mod_set_banned(tst.uid('erin'), false);
+  perform tst.login('erin');
+  perform tst.eq(public.is_admin(), true, 'an unbanned admin gets moderation back');
 end $$;
 rollback;
