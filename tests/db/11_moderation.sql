@@ -168,3 +168,132 @@ begin
   perform tst.eq(tst.count('select * from public.ads'), 4::bigint, 'admins see inactive ads');
 end $$;
 rollback;
+
+-- Deleting reported content does not shake off moderation: the report keeps
+-- what was said and who said it, and the author can still be banned.
+begin;
+do $$
+declare
+  v bigint;
+  rid bigint;
+  rep bigint;
+  r record;
+begin
+  v := tst.post('bob', 'bob asks a question');
+  perform tst.login('frank');
+  insert into public.replies (post_id, body) values (v, 'abusive reply') returning id into rid;
+  perform tst.login('bob');
+  insert into public.reports (reply_id, reason) values (rid, 'harassment') returning id into rep;
+  perform tst.login('frank');
+  delete from public.replies where id = rid;
+  perform tst.login('dave');
+  select * into r from public.mod_open_reports() where report_id = rep;
+  perform tst.eq(r.target_kind, 'gone', 'a deleted reply''s report shows as gone');
+  perform tst.eq(r.content, 'abusive reply', 'it still shows what the reply said');
+  perform tst.eq(r.target_user, tst.uid('frank'), 'and who wrote it');
+  perform tst.eq(r.target_handle, 'frank', 'with their handle');
+  perform public.mod_set_banned(r.target_user, true);
+  perform tst.ok((select is_banned from public.profiles where id = tst.uid('frank')), 'the author of deleted content can be banned');
+  -- Deleting the whole post does the same.
+  perform tst.logout();
+  v := tst.post('erin', 'erin says something awful');
+  perform tst.login('carol');
+  insert into public.reports (post_id, reason) values (v, 'hate') returning id into rep;
+  perform tst.login('erin');
+  delete from public.posts where id = v;
+  perform tst.login('dave');
+  select * into r from public.mod_open_reports() where report_id = rep;
+  perform tst.ok(r.target_kind = 'gone' and r.content = 'erin says something awful' and r.target_user = tst.uid('erin'),
+                 'a deleted post''s report keeps its body and author');
+end $$;
+rollback;
+
+-- Removing one reply, and resetting a profile.
+begin;
+do $$
+declare
+  v bigint;
+  rid bigint;
+  rep bigint;
+  n int;
+begin
+  v := tst.post('bob', 'thread for reply removal');
+  perform tst.login('erin');
+  insert into public.replies (post_id, body) values (v, 'rude reply') returning id into rid;
+  perform tst.login('bob');
+  insert into public.reports (reply_id, reason) values (rid, 'harassment') returning id into rep;
+  perform tst.eq((select replies from public.posts where id = v), 1, 'setup: one reply');
+
+  perform tst.login('carol');
+  perform tst.throws(format('select public.mod_set_reply_removed(%s, true)', rid), 'not_admin', 'members cannot remove replies');
+  perform tst.throws(format('select public.mod_reset_profile(%L)', tst.uid('erin')), 'not_admin', 'members cannot reset profiles');
+
+  perform tst.login('dave');
+  perform tst.throws(format('update public.replies set removed = true where id = %s', rid), '42501',
+                     'admins change replies only through the RPC');
+  perform public.mod_set_reply_removed(rid, true);
+  perform tst.ok((select post_removed from public.mod_open_reports() where report_id = rep), 'the report shows the reply as removed');
+  perform tst.ok(exists (select 1 from public.mod_open_reports() where report_id = rep and content = 'rude reply'),
+                 'moderators still see the removed reply in the report');
+  perform tst.login('bob');
+  perform tst.eq(tst.count(format('select id from public.replies where id = %s', rid)), 0::bigint, 'a removed reply is hidden');
+  perform tst.eq((select replies from public.posts where id = v), 0, 'a removed reply leaves the count');
+  perform tst.login('erin');
+  perform tst.eq((select data->>'action' from public.notifications where kind = 'mod'), 'reply_removed', 'its author is told');
+  perform tst.login('dave');
+  perform public.mod_set_reply_removed(rid, true);
+  perform tst.eq((select replies from public.posts where id = v), 0, 'removing twice changes nothing');
+  perform tst.logout();
+  perform tst.eq((select count(*)::int from public.notifications where kind = 'mod' and user_id = tst.uid('erin')), 1, 'and tells them once');
+  perform tst.login('dave');
+  perform public.mod_set_reply_removed(rid, false);
+  perform tst.login('bob');
+  perform tst.eq(tst.count(format('select id from public.replies where id = %s', rid)), 1::bigint, 'a restored reply is back');
+  perform tst.eq((select replies from public.posts where id = v), 1, 'and counts again');
+  perform tst.login('dave');
+  perform public.mod_set_reply_removed(rid, true);
+  perform tst.login('erin');
+  delete from public.replies where id = rid;
+  perform tst.eq((select replies from public.posts where id = v), 0, 'deleting a removed reply does not count it twice');
+  perform tst.login('dave');
+  perform tst.throws('select public.mod_set_reply_removed(999999999, true)', 'not_found', 'a missing reply is not_found');
+
+  -- Reset a profile
+  perform tst.login('erin');
+  update public.profiles set name = 'Offensive Name', bio = 'offensive bio' where id = auth.uid();
+  perform tst.login('dave');
+  perform public.mod_reset_profile(tst.uid('erin'));
+  perform tst.ok((select name = 'erin' and bio = '' from public.profiles where id = tst.uid('erin')),
+                 'resetting a profile puts the name back to the handle and clears the bio');
+  perform tst.logout();
+  perform tst.eq((select data->>'action' from public.notifications where user_id = tst.uid('erin') and data->>'action' = 'profile_reset'),
+                 'profile_reset', 'the person is told');
+  perform tst.login('dave');
+  perform tst.throws(format('select public.mod_reset_profile(%L)', gen_random_uuid()), 'not_found', 'a missing profile is not_found');
+end $$;
+rollback;
+
+-- Blocking a moderator does not hide anything from them. Members are still protected.
+begin;
+do $$
+declare
+  v bigint;
+  va bigint;
+  rid bigint;
+begin
+  v := tst.post('frank', 'frank posts after blocking the mods');
+  va := tst.post('alice', 'alice thread');
+  perform tst.login('frank');
+  insert into public.replies (post_id, body) values (va, 'frank reply') returning id into rid;
+  insert into public.blocks (blocked) values (tst.uid('dave'));
+  insert into public.blocks (blocked) values (tst.uid('carol'));
+  perform tst.login('dave');
+  perform tst.ok(exists (select 1 from public.posts where id = v), 'a moderator can read posts by someone who blocked them');
+  perform tst.ok(exists (select 1 from public.feed() f where f.id = v), 'and sees them in their feed');
+  perform tst.ok(exists (select 1 from public.posts_by(tst.uid('frank')) f where f.id = v), 'and on their profile');
+  perform tst.ok(exists (select 1 from public.replies where id = rid), 'and their replies');
+  perform tst.login('carol');
+  perform tst.ok(not exists (select 1 from public.posts where id = v), 'a member who was blocked still cannot');
+  perform tst.ok(not exists (select 1 from public.replies where id = rid), 'nor read their replies');
+end $$;
+rollback;

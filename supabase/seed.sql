@@ -31,8 +31,14 @@ select v.title, v.a_label, v.a_take, v.b_label, v.b_take,
  where not exists (select 1 from public.duels d where d.title = v.title);
 
 -- HELD: example ads. They stay off (active = false) and pay nothing.
--- These brands are placeholders. Replace them with real advertisers before
--- you turn ads on with: update public.ads set active = true where id = ...;
+-- These brands are placeholders: replace them with real advertisers before
+-- you turn ads on. Ads only show and pay while the database switch is on
+-- too, so turning ads on takes three steps (docs/GO-LIVE.md):
+--   1. update public.ads set active = true where id = ...;   (your real ads)
+--   2. set ads: true in SWITCHES in index.html, and publish it
+--   3. update public.settings set ads_enabled = true;
+-- To park ads again, run update public.settings set ads_enabled = false;
+-- first (that stops every payout), then set ads: false in index.html.
 insert into public.ads (brand, hue, bid_cents, copy, why, active)
 select v.brand, v.hue, v.bid_cents, v.copy, v.why, false
   from (values

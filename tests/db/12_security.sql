@@ -7,7 +7,7 @@ select tst.eq((select string_agg(c.relname, ', ' order by c.relname)
                 where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity),
               null::text, 'every public table has row level security enabled');
 select tst.eq((select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
-                where n.nspname = 'public' and c.relkind = 'r'), 17, 'all 17 tables exist');
+                where n.nspname = 'public' and c.relkind = 'r'), 20, 'all 20 tables exist');
 
 -- Policies only target authenticated.
 select tst.eq((select string_agg(tablename || '.' || policyname, ', ')
@@ -47,9 +47,10 @@ select tst.eq((select string_agg(p.oid::regprocedure::text, ', ' order by 1)
 select tst.eq((select string_agg(p.proname, ', ' order by p.proname)
                  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                 where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')),
-              'back_post, claim_daily_drop, delete_my_account, feed, handle_available, is_admin, is_blocked_with, '
-              'list_duels, mark_notifications_read, mod_create_duel, mod_open_reports, mod_resolve_report, '
-              'mod_set_banned, mod_set_post_removed, my_stats, posts_by, record_ad_view, sell_position, '
+              'ads_enabled, back_post, claim_daily_drop, delete_my_account, feed, handle_available, handle_reserved, '
+              'is_admin, is_blocked_with, list_duels, mark_notifications_read, mod_create_duel, mod_open_reports, '
+              'mod_reset_profile, mod_resolve_report, mod_set_banned, mod_set_post_removed, mod_set_reply_removed, '
+              'my_profile, my_stats, posts_by, record_ad_view, search_people, sell_position, '
               'settle_duels, touch_streak, unread_count, vote_duel',
               'authenticated can execute exactly the RPCs and policy helpers');
 
@@ -58,7 +59,8 @@ select tst.eq((select string_agg(p.proname, ', ' order by p.proname)
                  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                 where n.nspname = 'public'
                   and p.proname in ('award_xp', 'xp_level', 'add_notification', 'refund_positions', 'create_profile',
-                                    'market_base', 'market_price', 'blocked_pair', 'req_user', 'req_admin')
+                                    'market_base', 'market_price', 'blocked_pair', 'req_user', 'req_admin',
+                                    'payments_enabled', 'email_hash', 'record_ban', 'rate_check', 'claim_slot')
                   and (has_function_privilege('anon', p.oid, 'execute')
                        or has_function_privilege('authenticated', p.oid, 'execute'))),
               null::text, 'internal helpers are not executable by anon or authenticated');
@@ -86,13 +88,14 @@ select tst.eq((select string_agg(p.proname, ', ')
                   and p.proname in ('handle_available', 'touch_streak', 'claim_daily_drop', 'back_post', 'sell_position',
                                     'vote_duel', 'settle_duels', 'mark_notifications_read', 'unread_count', 'my_stats',
                                     'delete_my_account', 'record_ad_view', 'mod_open_reports', 'mod_set_post_removed',
-                                    'mod_set_banned', 'mod_resolve_report', 'mod_create_duel')
+                                    'mod_set_banned', 'mod_resolve_report', 'mod_create_duel', 'my_profile',
+                                    'mod_set_reply_removed', 'mod_reset_profile', 'handle_reserved', 'ads_enabled')
                   and not p.prosecdef),
               null::text, 'RPCs that write or read private data are SECURITY DEFINER');
 select tst.eq((select string_agg(p.proname, ', ' order by p.proname)
                  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-                where n.nspname = 'public' and p.proname in ('feed', 'posts_by', 'list_duels') and p.prosecdef),
-              null::text, 'feed, posts_by and list_duels run as the caller');
+                where n.nspname = 'public' and p.proname in ('feed', 'posts_by', 'list_duels', 'search_people') and p.prosecdef),
+              null::text, 'feed, posts_by, list_duels and search_people run as the caller');
 
 -- Behaviour as anon
 begin;
@@ -102,7 +105,8 @@ declare
   t text;
 begin
   foreach t in array array['profiles','posts','post_edits','reactions','reposts','replies','follows','mutes','blocks',
-                           'reports','notifications','positions','duels','duel_votes','xp_log','ads','ad_views'] loop
+                           'reports','notifications','positions','duels','duel_votes','xp_log','ads','ad_views',
+                           'settings','bans','write_log'] loop
     perform tst.throws(format('select * from public.%I', t), '42501', 'anon cannot read ' || t);
   end loop;
   perform tst.throws($q$insert into public.posts (body) values ('anon post')$q$, '42501', 'anon cannot post');
@@ -126,7 +130,27 @@ select tst.throws($q$select public.blocked_pair(auth.uid(), auth.uid())$q$, '425
 select tst.throws($q$select public.req_admin()$q$, '42501', 'members cannot call req_admin');
 select tst.throws($q$select public.market_price(1, 1, 1, 1, 1)$q$, '42501', 'members cannot call market_price');
 select tst.eq(public.is_admin(), false, 'is_admin is false for members');
+select tst.throws($q$select public.rate_check(auth.uid(), 'post', 1000, 1000)$q$, '42501', 'members cannot call rate_check');
+select tst.throws($q$select public.claim_slot(auth.uid(), 'drop')$q$, '42501', 'members cannot call claim_slot');
+select tst.throws($q$select public.record_ban(auth.uid())$q$, '42501', 'members cannot call record_ban');
+select tst.throws($q$select public.payments_enabled()$q$, '42501', 'members cannot call payments_enabled');
+do $$
+declare
+  t text;
+begin
+  foreach t in array array['settings', 'bans', 'write_log', 'xp_log'] loop
+    perform tst.throws(format('select * from public.%I', t), '42501', 'members cannot read ' || t);
+  end loop;
+end $$;
+select tst.throws($q$update public.settings set ads_enabled = true$q$, '42501', 'members cannot turn ads on');
+select tst.throws($q$update public.settings set payments_enabled = true$q$, '42501', 'members cannot turn payments on');
+select tst.throws($q$delete from public.write_log$q$, '42501', 'members cannot clear their rate limits');
 rollback;
+
+-- The server switches start off, and there is exactly one row.
+select tst.eq((select count(*)::int from public.settings), 1, 'settings has one row');
+select tst.ok((select not ads_enabled and not payments_enabled from public.settings), 'ads and payments are off on the server');
+select tst.throws($q$insert into public.settings (id) values (false)$q$, '23514', 'settings cannot get a second row');
 
 begin;
 select tst.login('dave');

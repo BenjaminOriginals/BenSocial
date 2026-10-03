@@ -10,8 +10,8 @@ select tst.lives($q$update public.profiles set name = 'Alice A.', hue = 200, bio
                  'can update name, hue, bio, dial, ad_price_cents on own row');
 select tst.eq((select name from public.profiles where id = auth.uid()), 'Alice A.', 'name updated');
 select tst.eq((select bio from public.profiles where id = auth.uid()), 'Hi there', 'bio updated');
-select tst.eq((select dial->>'recency' from public.profiles where id = auth.uid()), '50', 'dial updated');
-select tst.eq((select ad_price_cents from public.profiles where id = auth.uid()), 9, 'ad price updated');
+select tst.eq((select dial->>'recency' from tst.profiles where id = auth.uid()), '50', 'dial updated');
+select tst.eq((select ad_price_cents from tst.profiles where id = auth.uid()), 9, 'ad price updated');
 select tst.lives($q$update public.profiles set handle = 'Alice.New' where id = auth.uid()$q$,
                  'can update own handle');
 select tst.eq((select handle from public.profiles where id = auth.uid()), 'alice.new', 'handle is lowercased on update');
@@ -66,7 +66,86 @@ select tst.eq((select name from public.profiles where id = tst.uid('bob')), 'Bob
 
 -- Reading
 select tst.eq((select handle from public.profiles where id = tst.uid('bob')), 'bob', 'can read other profiles');
-select tst.eq(tst.count('select * from public.profiles'), 7::bigint, 'can list profiles');
+select tst.eq(tst.count('select id from public.profiles'), 7::bigint, 'can list profiles');
+rollback;
+
+-- Privacy: other people see only the public columns. Your own private
+-- columns (XP, clout, streak, dial, earnings, admin flag) come from my_profile().
+begin;
+update public.profiles set earnings_cents = 14, clout = 777, dial = '{"spicy":80}' where id = tst.uid('bob');
+select tst.login('carol');
+select tst.lives($q$select id, handle, name, hue, bio, pro, followers_count, following_count, is_banned, created_at
+                     from public.profiles$q$, 'public profile columns are readable');
+do $$
+declare
+  c text;
+begin
+  foreach c in array array['xp', 'clout', 'streak', 'last_active', 'active_days', 'drop_day', 'dial',
+                           'ad_price_cents', 'earnings_cents', 'is_admin', 'accepted_terms_at'] loop
+    perform tst.throws(format('select %I from public.profiles where id = %L', c, tst.uid('bob')), '42501',
+                       'members cannot read ' || c || ' of other people');
+  end loop;
+end $$;
+select tst.throws($q$select * from public.profiles$q$, '42501', 'select * on profiles is refused (it includes private columns)');
+select tst.throws($q$select handle from public.profiles where is_admin$q$, '42501', 'members cannot list the moderators');
+select tst.throws($q$select handle from public.profiles where earnings_cents > 0$q$, '42501', 'members cannot filter on earnings');
+select tst.login('bob');
+select tst.throws($q$select clout from public.profiles where id = auth.uid()$q$, '42501', 'even your own private columns are not in the table API');
+select tst.eq((public.my_profile()->>'clout')::numeric, 777::numeric, 'my_profile returns your clout');
+select tst.eq((public.my_profile()->>'earnings_cents')::numeric, 14::numeric, 'my_profile returns your earnings');
+select tst.eq(public.my_profile()->'dial'->>'spicy', '80', 'my_profile returns your dial');
+select tst.eq(public.my_profile()->>'handle', 'bob', 'my_profile is your own row');
+select tst.eq((select count(*)::int from json_object_keys(public.my_profile())),
+              (select count(*)::int from pg_attribute where attrelid = 'public.profiles'::regclass and attnum > 0 and not attisdropped),
+              'my_profile has every column');
+select tst.lives($q$update public.profiles set dial = '{"spicy":10}', ad_price_cents = 5 where id = auth.uid()$q$,
+                 'saving the dial and attention price still works with column privileges');
+select tst.eq(public.my_profile()->'dial'->>'spicy', '10', 'dial saved');
+select tst.login_id('99999999-9999-4999-8999-999999999999');
+select tst.ok(public.my_profile() is null, 'my_profile is null without a profile');
+select tst.anon();
+select tst.throws($q$select public.my_profile()$q$, '42501', 'anon cannot call my_profile');
+rollback;
+
+-- Reserved handles and names
+begin;
+select tst.login('alice');
+do $$
+declare
+  h text;
+begin
+  foreach h in array array['admin', 'bensocial', 'support', 'moderator', 'official', 'root', 'staff', 'help',
+                           'security', 'ben.social', 'bensocial_team', 'the_ben_social'] loop
+    perform tst.eq(public.handle_available(h), false, 'handle_available: ' || h || ' is reserved');
+    perform tst.throws(format('update public.profiles set handle = %L where id = auth.uid()', h), 'handle_taken',
+                       'members cannot take the reserved handle ' || h);
+  end loop;
+end $$;
+select tst.eq(public.handle_available('benjamin'), true, 'handles merely starting with ben are free');
+select tst.throws($q$update public.profiles set name = 'BenSocial Support' where id = auth.uid()$q$, 'name_reserved',
+                  'members cannot use BenSocial in their name');
+select tst.throws($q$update public.profiles set name = 'Ben.Social team' where id = auth.uid()$q$, 'name_reserved',
+                  'BenSocial with punctuation is caught too');
+select tst.lives($q$update public.profiles set name = 'Ben from Social Club' where id = auth.uid()$q$, 'ordinary names are fine');
+select tst.login('dave');
+select tst.lives($q$update public.profiles set handle = 'bensocial', name = 'BenSocial' where id = auth.uid()$q$,
+                 'admins can take a reserved handle and the BenSocial name');
+select tst.logout();
+select tst.lives($q$update public.profiles set handle = 'support' where id = tst.uid('erin')$q$,
+                 'the owner can hand out a reserved handle in the SQL editor');
+rollback;
+
+begin;
+do $$
+declare
+  v uuid;
+begin
+  v := tst.signup(null, '2c000000-0000-4000-8000-0000000000aa', '{"handle":"bensocial","name":"BenSocial Support"}');
+  perform tst.eq((select handle from public.profiles where id = v), 'user2c000000', 'sign-up with a reserved handle falls back');
+  perform tst.eq((select name from public.profiles where id = v), 'user2c000000', 'sign-up with BenSocial in the name falls back to the handle');
+  v := tst.signup(null, '2d000000-0000-4000-8000-0000000000ab', '{"handle":"admin"}');
+  perform tst.eq((select handle from public.profiles where id = v), 'user2d000000', 'sign-up with admin falls back');
+end $$;
 rollback;
 
 -- handle_available

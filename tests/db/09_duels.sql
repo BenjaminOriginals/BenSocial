@@ -24,7 +24,7 @@ begin
                  'list_duels is ordered by ends_at');
   select id into d from public.list_duels() order by ends_at limit 1;
 
-  v_xp := (select xp from public.profiles where id = auth.uid());
+  v_xp := (select xp from tst.profiles where id = auth.uid());
   perform tst.throws(format('select public.vote_duel(%s, %L)', d, 'c'), 'bad_side', 'side other than a/b is bad_side');
   perform tst.throws(format('select public.vote_duel(%s, null)', d), 'bad_side', 'null side is bad_side');
   perform tst.throws(format('select public.vote_duel(%s, %L)', 999999999, 'a'), 'not_found', 'missing duel is not_found');
@@ -33,7 +33,7 @@ begin
   perform tst.eq(r->>'side', 'a', 'vote returns my side');
   perform tst.eq((r->>'a_votes')::int, 1, 'vote returns updated a_votes');
   perform tst.eq((r->>'b_votes')::int, 0, 'vote returns b_votes');
-  perform tst.eq((select xp from public.profiles where id = auth.uid()), v_xp + 5, 'voting earns 5 XP');
+  perform tst.eq((select xp from tst.profiles where id = auth.uid()), v_xp + 5, 'voting earns 5 XP');
   perform tst.throws(format('select public.vote_duel(%s, %L)', d, 'b'), 'already_voted', 'second vote is already_voted');
   perform tst.eq((select my_side from public.list_duels() where id = d), 'a', 'list_duels shows my side');
   perform tst.eq((select votes from json_to_record(public.my_stats()) as t(votes int)), 1, 'my_stats counts votes');
@@ -75,9 +75,9 @@ do $$
 declare
   d bigint;
   n int;
-  v_alice numeric := (select clout from public.profiles where id = tst.uid('alice'));
-  v_bob numeric := (select clout from public.profiles where id = tst.uid('bob'));
-  v_carol numeric := (select clout from public.profiles where id = tst.uid('carol'));
+  v_alice numeric := (select clout from tst.profiles where id = tst.uid('alice'));
+  v_bob numeric := (select clout from tst.profiles where id = tst.uid('bob'));
+  v_carol numeric := (select clout from tst.profiles where id = tst.uid('carol'));
   nt public.notifications%rowtype;
 begin
   insert into public.duels (title, a_label, a_take, b_label, b_take, starts_at, ends_at, a_votes, b_votes)
@@ -91,9 +91,9 @@ begin
   perform tst.ok(n >= 1, 'settle_duels returns how many it settled');
   perform tst.logout();
   perform tst.eq((select settled from public.duels where id = d), true, 'duel marked settled');
-  perform tst.eq((select clout from public.profiles where id = tst.uid('alice')), v_alice + 100, 'winner alice +100 clout');
-  perform tst.eq((select clout from public.profiles where id = tst.uid('bob')), v_bob + 100, 'winner bob +100 clout');
-  perform tst.eq((select clout from public.profiles where id = tst.uid('carol')), v_carol, 'loser carol gets nothing');
+  perform tst.eq((select clout from tst.profiles where id = tst.uid('alice')), v_alice + 100, 'winner alice +100 clout');
+  perform tst.eq((select clout from tst.profiles where id = tst.uid('bob')), v_bob + 100, 'winner bob +100 clout');
+  perform tst.eq((select clout from tst.profiles where id = tst.uid('carol')), v_carol, 'loser carol gets nothing');
   select * into nt from public.notifications where user_id = tst.uid('alice') and kind = 'duel_won';
   perform tst.eq(nt.data, '{"title": "Settle me", "clout": 100}'::jsonb, 'winner notification has title and clout');
   select * into nt from public.notifications where user_id = tst.uid('carol') and kind = 'duel_lost';
@@ -103,7 +103,7 @@ begin
   n := public.settle_duels();
   perform tst.eq(n, 0, 'second settle settles nothing');
   perform tst.logout();
-  perform tst.eq((select clout from public.profiles where id = tst.uid('alice')), v_alice + 100, 'no double payout');
+  perform tst.eq((select clout from tst.profiles where id = tst.uid('alice')), v_alice + 100, 'no double payout');
   perform tst.eq((select count(*)::int from public.notifications where kind in ('duel_won', 'duel_lost')), 3,
                  'no duplicate duel notifications');
 
@@ -117,7 +117,7 @@ begin;
 do $$
 declare
   d bigint;
-  v_alice numeric := (select clout from public.profiles where id = tst.uid('alice'));
+  v_alice numeric := (select clout from tst.profiles where id = tst.uid('alice'));
 begin
   insert into public.duels (title, a_label, a_take, b_label, b_take, starts_at, ends_at, a_votes, b_votes)
   values ('Tie', 'A', 'take a', 'B', 'take b', now() - interval '2 hours', now() - interval '1 minute', 1, 1)
@@ -126,7 +126,7 @@ begin
   perform tst.login('carol');
   perform public.settle_duels();
   perform tst.logout();
-  perform tst.eq((select clout from public.profiles where id = tst.uid('alice')), v_alice, 'a tie pays nothing');
+  perform tst.eq((select clout from tst.profiles where id = tst.uid('alice')), v_alice, 'a tie pays nothing');
   perform tst.eq((select count(*)::int from public.notifications where kind = 'duel_lost' and data = '{"title": "Tie", "tie": true}'::jsonb), 2,
                  'every voter gets duel_lost with tie true');
   perform tst.eq((select count(*)::int from public.notifications where kind = 'duel_won'), 0, 'nobody wins a tie');

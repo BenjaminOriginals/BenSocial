@@ -4,9 +4,12 @@
 // Held monetization in live mode. The committed index.html has both
 // switches off (live.spec.js runs that). Here the gateway serves scratch
 // copies with one switch flipped, the way the owner would flip it:
-//   ads on       ads come from public.ads (active only), record_ad_view
-//                credits 70% once per ad per day, attention price saves
-//   payments on  every money button shows "Payments aren't connected yet."
+//   ads on       nothing shows or pays until public.settings.ads_enabled is
+//                on too; then ads come from public.ads (active only),
+//                record_ad_view credits 70% once per ad per day, the
+//                attention price saves, and an ad pulled mid-session
+//                disappears quietly
+//   payments on  every money button shows "Payments aren't available yet."
 // Run through run.sh.
 // =====================================================================
 
@@ -19,7 +22,7 @@ const {
 
 const ROOT = process.env.E2E_ROOT || path.join(__dirname, '..', '..');
 const SCRATCH = process.env.E2E_SCRATCH_DIR;
-const PAY_MSG = "Payments aren't connected yet. See docs/GO-LIVE.md.";
+const PAY_MSG = "Payments aren't available yet.";
 const C = { name: 'Cleo Viewer', handle: 'cleo_e2e', email: 'cleo@e2e.test', password: 'cleo password 1' };
 
 // A scratch copy of index.html with switches flipped, served at /scratch/<name>.html.
@@ -42,7 +45,7 @@ async function main() {
   let ok = false;
   try {
     // ------------------------------------------------------------ setup
-    begin('Setup: another account with three posts, and one active ad');
+    begin('Setup: another account with three posts, and one active ad row');
     const key = (await (await fetch(BASE + '/__health')).json()).anonKey;
     const r = await fetch(BASE + '/auth/v1/signup', {
       method: 'POST', headers: { 'Content-Type': 'application/json', apikey: key },
@@ -56,14 +59,30 @@ async function main() {
     const adId = String(await db.val(`insert into public.ads (brand, hue, bid_cents, copy, why, active)
       values ('E2E Coffee', 30, 10.00, 'Coffee that tastes like coffee.', 'Broad campaign. No targeting.', true) returning id`));
 
-    // ------------------------------------------------------------ ads on
-    begin('Ads on: ads load from the ads table and pay once');
+    // ------------------------------------------------------------ server switch off
+    begin('Ads on in the app but off on the server: nothing shows or pays');
+    eq(await db.val('select ads_enabled from public.settings'), false, 'ads start off on the server');
     const u = await openUser(browser, 'C', { url: ADS }); users.push(u);
     let page = u.page;
     await waitAuth(page);
     await signUpUI(page, C);
     C.id = await db.val('select id from auth.users where email = $1', [C.email]);
     check(u.requests.some(x => /GET .*\/rest\/v1\/ads\?.*active=eq\.true/.test(x)), 'the app reads active ads from the ads table');
+    await page.waitForSelector('#view .post');
+    eq(await page.locator('#view [data-ad]').count(), 0, 'an active ad row shows nobody anything while the server switch is off');
+    const token = await page.evaluate(() => { const k = Object.keys(localStorage).find(x => /^sb-.+-auth-token$/.test(x)); return JSON.parse(localStorage.getItem(k)).access_token; });
+    const direct = await fetch(BASE + '/rest/v1/rpc/record_ad_view', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', apikey: key, Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ p_ad: Number(adId), p_today: localDay() }),
+    });
+    const body = await direct.json();
+    eq([direct.status, body.message], [400, 'ads_off'], 'calling record_ad_view directly is refused with ads_off');
+    near((await db.one('select earnings_cents from public.profiles where id = $1', [C.id])).earnings_cents, 0, 1e-9, 'no earnings');
+
+    // ------------------------------------------------------------ ads on
+    begin('Ads on: ads load from the ads table and pay once');
+    await db.rows('update public.settings set ads_enabled = true'); // How the owner turns ads on in the database.
+    await page.reload(); await waitApp(page);
     const ad = `#view [data-ad="${adId}"]`;
     await page.waitForSelector(ad);
     check((await textOf(page, ad)).includes('Pays you 7.0¢'), 'ad card offers 70% of the 10¢ bid');
@@ -101,6 +120,28 @@ async function main() {
     await page.reload(); await waitApp(page);
     await go(page, 'wallet');
     eq(await page.inputValue('#adPrice'), '12', 'attention price comes back from the server');
+
+    begin('Ads on: an ad pulled while someone has it on screen disappears quietly');
+    const teaId = String(await db.val(`insert into public.ads (brand, hue, bid_cents, copy, why, active)
+      values ('E2E Tea', 120, 15.00, 'Tea that tastes like tea.', 'Broad campaign. No targeting.', true) returning id`));
+    await go(page, 'feed');
+    await page.reload(); await waitApp(page);
+    const tea = `#view [data-ad="${teaId}"]`;
+    await page.waitForSelector(tea);
+    await db.rows('update public.ads set active = false where id = $1', [teaId]); // The owner pulls it.
+    const toastsBefore = await page.evaluate(() => document.getElementById('toasts').innerText);
+    await u.expect(/status of 400/, async () => {
+      const r = await withResponse(page, rpcPath('record_ad_view'), () => page.locator(tea).scrollIntoViewIfNeeded());
+      eq(r.status(), 400, 'record_ad_view refuses the pulled ad');
+      await page.locator(tea).waitFor({ state: 'detached' });
+    });
+    check(true, 'the pulled ad leaves the feed');
+    await page.waitForTimeout(300);
+    const toastsAfter = await page.evaluate(() => document.getElementById('toasts').innerText);
+    check(!toastsAfter.includes("That isn't available anymore.") && !(toastsAfter.length > toastsBefore.length && /went wrong/.test(toastsAfter)),
+          'no error toast for a pulled ad');
+    await page.evaluate(() => window.scrollTo(0, 0)); await page.mouse.wheel(0, 2000); await page.waitForTimeout(300);
+    eq(u.requests.filter(x => x.includes('/rpc/record_ad_view')).length, 3, 'and it is not retried');
 
     // ------------------------------------------------------------ payments on
     begin('Payments on: money buttons show the not-connected message');

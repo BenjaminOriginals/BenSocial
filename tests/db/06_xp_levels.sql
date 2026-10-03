@@ -17,11 +17,11 @@ select tst.eq(public.xp_level(700), 5, 'level 5 at 700 XP');
 begin;
 do $$
 declare
-  v_xp int := (select xp from public.profiles where id = tst.uid('carol'));
+  v_xp int := (select xp from tst.profiles where id = tst.uid('carol'));
 begin
   perform tst.eq(public.award_xp(tst.uid('carol'), 10, 'test', 'r1'), true, 'first grant returns true');
   perform tst.eq(public.award_xp(tst.uid('carol'), 10, 'test', 'r1'), false, 'same reason and ref returns false');
-  perform tst.eq((select xp from public.profiles where id = tst.uid('carol')), v_xp + 10, 'XP granted once');
+  perform tst.eq((select xp from tst.profiles where id = tst.uid('carol')), v_xp + 10, 'XP granted once');
   perform tst.eq(public.award_xp(tst.uid('carol'), 10, 'test', 'r2'), true, 'a new ref grants again');
   perform tst.eq(public.award_xp(tst.uid('carol'), 0, 'test', 'r3'), false, 'zero XP grants nothing');
   perform tst.eq(public.award_xp(null, 10, 'test', 'r4'), false, 'no user grants nothing');
@@ -33,12 +33,12 @@ begin;
 update public.profiles set xp = 95 where id = tst.uid('bob');
 do $$
 declare
-  v_clout numeric := (select clout from public.profiles where id = tst.uid('bob'));
+  v_clout numeric := (select clout from tst.profiles where id = tst.uid('bob'));
   nt public.notifications%rowtype;
 begin
   perform tst.post('bob', 'This post levels me up');
-  perform tst.eq((select xp from public.profiles where id = tst.uid('bob')), 120, 'post XP added');
-  perform tst.eq((select clout from public.profiles where id = tst.uid('bob')), v_clout + 100, 'level 2 pays 100 clout');
+  perform tst.eq((select xp from tst.profiles where id = tst.uid('bob')), 120, 'post XP added');
+  perform tst.eq((select clout from tst.profiles where id = tst.uid('bob')), v_clout + 100, 'level 2 pays 100 clout');
   select * into nt from public.notifications where user_id = tst.uid('bob') and kind = 'level';
   perform tst.eq(nt.data, '{"level": 2, "bonus": 100}'::jsonb, 'level notification has level and bonus');
   perform tst.eq(nt.actor_id, null::uuid, 'level notification has no actor');
@@ -49,11 +49,11 @@ rollback;
 begin;
 do $$
 declare
-  v_clout numeric := (select clout from public.profiles where id = tst.uid('carol'));
+  v_clout numeric := (select clout from tst.profiles where id = tst.uid('carol'));
 begin
   perform public.award_xp(tst.uid('carol'), 460, 'test', 'big');
-  perform tst.eq((select xp from public.profiles where id = tst.uid('carol')), 460, 'big grant applied');
-  perform tst.eq((select clout from public.profiles where id = tst.uid('carol')), v_clout + 450,
+  perform tst.eq((select xp from tst.profiles where id = tst.uid('carol')), 460, 'big grant applied');
+  perform tst.eq((select clout from tst.profiles where id = tst.uid('carol')), v_clout + 450,
                  'crossing levels 2, 3 and 4 pays 450 clout');
   perform tst.eq((select array_agg((data->>'level')::int order by (data->>'level')::int)
                     from public.notifications where user_id = tst.uid('carol') and kind = 'level'),

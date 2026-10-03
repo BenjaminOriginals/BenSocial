@@ -2,14 +2,16 @@
 'use strict';
 // =====================================================================
 // Live mode, account edge cases against the real supabase-js client:
-// email confirmation, duplicate email, password recovery by link, an
-// expired link, token refresh on reload, and the repair of a missing
-// profile row. Run through run.sh.
+// email confirmation and sending it again, duplicate emails (both ways
+// Supabase answers), an address the email sender refuses, password
+// recovery by link, an expired link, token refresh on reload, the repair
+// of a missing profile row, and a handle taken while signing up. Run
+// through run.sh.
 // =====================================================================
 
 const {
   BASE, launch, db, begin, check, eq, summary, openUser, screenshots,
-  toast, gateText, waitApp, waitAuth, go, signInUI, signOutUI,
+  toast, gateText, waitApp, waitAuth, go, signInUI, signOutUI, withResponse,
 } = require('./lib');
 
 const C = { name: 'Cara Confirm', handle: 'cara_e2e', email: 'cara@confirm.test', password: 'first password 1' };
@@ -22,6 +24,18 @@ async function links(email) {
   return r.json();
 }
 const formMsg = page => page.evaluate(() => { const m = document.querySelector('#gate .form-msg'); return m && !m.hidden ? m.innerText : ''; });
+const DUPLICATE = 'An account already uses that email. Sign in, or choose Forgot password.';
+const resendVisible = page => page.locator('#gate [data-act="resend"]').isVisible();
+async function fillSignUp(page, { name, handle, email, password }) {
+  await page.click('#tab-signup');
+  await page.fill('#su-name', name);
+  await page.fill('#su-handle', handle);
+  await page.locator('#su-handle-status', { hasText: 'Available' }).waitFor();
+  await page.fill('#su-email', email);
+  await page.fill('#su-password', password);
+  await page.check('#su-age');
+  await page.check('#su-terms');
+}
 
 async function main() {
   const browser = await launch();
@@ -46,37 +60,61 @@ async function main() {
     await page.locator('#gate .form-msg', { hasText: 'Check your email to confirm your account, then sign in.' }).waitFor();
     check(true, 'no session: the app asks to confirm by email');
     eq(await page.inputValue('#auth-email'), C.email, 'sign-in form keeps the email');
+    check(await resendVisible(page), 'a button sends the confirmation email again');
     C.id = await db.val('select id from auth.users where email = $1', [C.email]);
     eq(await db.val('select handle from public.profiles where id = $1', [C.id]), C.handle, 'profile exists before confirmation');
+    const firstLink = (await links(C.email)).signup;
+    await withResponse(page, r => r.url().includes('/auth/v1/resend'), () => page.click('#gate [data-act="resend"]'));
+    await page.locator('#gate .form-msg', { hasText: 'we sent a new link' }).waitFor();
+    check(true, 'sending it again confirms in plain words');
+    const confirmLink = (await links(C.email)).signup;
+    check(!!confirmLink && confirmLink !== firstLink, 'a new confirmation link was sent');
     await u.expect(/status of 400/, async () => {
       await signInUI(page, C.email, C.password);
       await page.locator('#gate .form-msg', { hasText: 'Confirm your email first.' }).waitFor();
     });
     check(true, 'signing in before confirming shows a plain message');
-    const confirmLink = (await links(C.email)).signup;
+    check(await resendVisible(page), 'and offers to send the email again');
     check(!!confirmLink && confirmLink.includes('redirect_to=' + encodeURIComponent(BASE + '/')), 'confirmation link returns to the app (emailRedirectTo)');
     await page.goto(confirmLink);
     await waitApp(page);
     check((await page.textContent('#rail .me-name')).includes(C.name), 'the confirmation link signs you in');
+    eq(await page.evaluate(() => document.activeElement && document.activeElement.id), 'view', 'keyboard focus moves into the app');
     check(!/access_token/.test(await page.evaluate(() => location.href)), 'tokens are cleared from the address bar');
     check((await db.val('select email_confirmed_at from auth.users where id = $1', [C.id])) != null, 'email_confirmed_at set');
 
     // ------------------------------------------------------------ duplicate email
     begin('Sign-up with an email that already has an account');
     await signOutUI(page);
-    await page.click('#tab-signup');
-    await page.fill('#su-name', 'Someone Else');
-    await page.fill('#su-handle', 'someone_else');
-    await page.locator('#su-handle-status', { hasText: 'Available' }).waitFor();
-    await page.fill('#su-email', C.email);
-    await page.fill('#su-password', 'whatever pass');
-    await page.check('#su-age');
-    await page.check('#su-terms');
+    // With "Confirm email" on, Supabase answers 200 with a stand-in user that has no identities, and sends nothing.
+    await fillSignUp(page, { name: 'Someone Else', handle: 'someone_else', email: C.email, password: 'whatever pass' });
+    const dup = await withResponse(page, r => r.url().includes('/auth/v1/signup'), () => page.click('#gate [data-form="signup"] button:not([type])'));
+    eq(dup.status(), 200, 'setup: Supabase answers a duplicate with 200 while Confirm email is on');
+    await page.locator('#gate .form-msg', { hasText: DUPLICATE }).waitFor();
+    check(!(await gateText(page)).includes('Check your email'), 'duplicate email says so, and does not promise an email');
+    eq(await db.val(`select count(*)::int from public.profiles where handle = 'someone_else'`), 0, 'no second account was made');
+    // With "Confirm email" off, Supabase answers 422.
+    await fillSignUp(page, { name: 'Someone Else', handle: 'someone_else', email: 'kit@e2e.test', password: 'whatever pass' });
+    await db.rows(`insert into auth.users (email, encrypted_password, email_confirmed_at) values ('kit@e2e.test', 'x', now())`);
     await u.expect(/status of 422/, async () => {
       await page.click('#gate [data-form="signup"] button:not([type])');
-      await page.locator('#gate .form-msg', { hasText: 'An account already uses that email. Try signing in.' }).waitFor();
+      await page.locator('#gate .form-msg', { hasText: DUPLICATE }).waitFor();
     });
-    check(true, 'duplicate email shows a plain message');
+    check(true, 'the 422 answer shows the same plain message');
+    await db.rows(`delete from auth.users where email = 'kit@e2e.test'`);
+
+    begin('An address the email sender will not write to');
+    await page.click('#tab-signin');
+    await page.route('**/auth/v1/signup*', route => route.fulfill({ status: 400, contentType: 'application/json',
+      body: JSON.stringify({ code: 'email_address_not_authorized', message: 'Email address "friend@example.com" cannot be used as it is not authorized' }) }));
+    await fillSignUp(page, { name: 'A Friend', handle: 'a_friend', email: 'friend@example.com', password: 'friend password 1' });
+    await u.expect(/status of 400/, async () => {
+      await page.click('#gate [data-form="signup"] button:not([type])');
+      await page.locator('#gate .form-msg', { hasText: "We can't send email to that address yet." }).waitFor();
+    });
+    check(true, 'email_address_not_authorized gets a plain message, not "Something went wrong"');
+    await page.unroute('**/auth/v1/signup*');
+    await page.fill('#su-email', C.email);
 
     // ------------------------------------------------------------ recovery
     begin('Forgot password, then the recovery link');
@@ -116,8 +154,9 @@ async function main() {
     begin('An expired or used link');
     await signOutUI(page);
     await page.goto(recoveryLink); // Already used.
-    await page.locator('#gate .form-msg', { hasText: 'That link expired or was already used. Request a new one.' }).waitFor();
+    await page.locator('#gate .form-msg', { hasText: 'That link expired or was already used.' }).waitFor();
     check(true, 'a used link shows a plain message on the sign-in screen');
+    check(await resendVisible(page) && await page.locator('#gate [data-act="forgot"]').isVisible(), 'with both ways to get a new link');
 
     // ------------------------------------------------------------ token refresh
     begin('An expired session refreshes on reload');
@@ -176,6 +215,20 @@ async function main() {
     const mine = await k.page.evaluate(() => [...document.querySelectorAll('#view > .feed .post-text')].map(e => e.innerText));
     check(!mine.includes('Posted with a publishable key.'), 'Your posts lists only the new account\'s posts');
     check((await k.page.textContent('#view .profile-card')).includes('@' + C.handle), 'Profile shows the new account');
+
+    // ------------------------------------------------------------ handle taken meanwhile
+    begin('A handle taken while signing up: the app says which one you got');
+    const h = await openUser(browser, 'H'); users.push(h);
+    await waitAuth(h.page);
+    await fillSignUp(h.page, { name: 'Hana Late', handle: 'hana_e2e', email: 'hana@e2e.test', password: 'hana password 1' });
+    await db.rows(`insert into auth.users (email, encrypted_password, email_confirmed_at, raw_user_meta_data)
+                   values ('first.hana@e2e.test', 'x', now(), '{"handle":"hana_e2e"}')`); // Someone else gets there first.
+    await h.page.click('#gate [data-form="signup"] button:not([type])');
+    await waitApp(h.page);
+    const got = await db.val(`select p.handle from public.profiles p join auth.users u using (id) where u.email = 'hana@e2e.test'`);
+    check(/^user[0-9a-f]{8}$/.test(got), `the server gave a fallback handle (${got})`);
+    await toast(h.page, `@hana_e2e was taken, so your handle is @${got}.`);
+    check(true, 'the app says so, and where to change it');
 
     begin('No page errors');
     for (const x of users) eq(x.errors, [], `${x.label}: no page errors and no unexpected console errors`);

@@ -6,7 +6,9 @@
 # applies supabase/schema.sql (twice, to prove it can be re-run) and
 # supabase/seed.sql (twice), loads the test helpers and fixture accounts,
 # then runs every tests/db/NN_*.sql file. A full run finishes by applying
-# schema.sql once more on top of the test data (after_rerun.sql checks it).
+# schema.sql once more on top of the test data: before_rerun.sql turns the
+# server switches on and leaves a ban behind first, and after_rerun.sql
+# checks that nothing was lost or undone.
 # The cluster is stopped and deleted on exit, pass or fail.
 #
 #   tests/db/run.sh            run everything
@@ -93,9 +95,10 @@ for file in "$HERE"/[0-9][0-9]_*.sql; do
   run_test_file "$file"
 done
 
-# Re-apply the schema on a database that now holds users, posts and
-# settings, then check nothing was lost or broken.
+# Re-apply the schema on a database that now holds users, posts,
+# settings and bans, then check nothing was lost or broken.
 if [ "${#FILTERS[@]}" = "0" ]; then
+  step "settings and bans before the re-run" "$SUPERUSER" "$HERE/before_rerun.sql"
   step "schema.sql (re-run on live data)" postgres "$ROOT/supabase/schema.sql"
   run_test_file "$HERE/after_rerun.sql"
 fi

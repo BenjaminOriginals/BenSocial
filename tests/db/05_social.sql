@@ -11,7 +11,7 @@ declare
 begin
   v := tst.post('alice', 'React to me');
   perform tst.login('bob');
-  v_xp := (select xp from public.profiles where id = auth.uid());
+  v_xp := (select xp from tst.profiles where id = auth.uid());
 
   -- The exact statement PostgREST runs for supabase-js upsert({post_id, kind}, {onConflict: 'user_id,post_id'})
   insert into public.reactions (post_id, kind) values (v, 'like')
@@ -19,7 +19,7 @@ begin
   select * into p from public.posts where id = v;
   perform tst.eq(p.likes, 1, 'like increments likes');
   perform tst.eq(p.dislikes, 0, 'like leaves dislikes');
-  perform tst.eq((select xp from public.profiles where id = auth.uid()), v_xp + 2, 'giving a like earns 2 XP');
+  perform tst.eq((select xp from tst.profiles where id = auth.uid()), v_xp + 2, 'giving a like earns 2 XP');
   perform tst.eq(p.price, round(5 + 0.8 * sqrt(1::numeric), 4), 'price follows the curve after a like');
   perform tst.eq(p.price_history, array[5, 5.8]::numeric[], 'price change is appended to price_history');
 
@@ -41,7 +41,7 @@ begin
 
   insert into public.reactions (post_id, kind) values (v, 'like');
   perform tst.eq((select likes from public.posts where id = v), 1, 'liking again counts again');
-  perform tst.eq((select xp from public.profiles where id = auth.uid()), v_xp + 2, 'liking the same post again gives no more XP');
+  perform tst.eq((select xp from tst.profiles where id = auth.uid()), v_xp + 2, 'liking the same post again gives no more XP');
 
   perform tst.eq(tst.count('select * from public.reactions'), 1::bigint, 'I can see my reaction');
   perform tst.eq((select likes_given from json_to_record(public.my_stats()) as s(likes_given int)), 1, 'my_stats counts likes given');
@@ -128,17 +128,17 @@ declare
 begin
   v := tst.post('alice', 'Repost me');
   perform tst.login('bob');
-  v_xp := (select xp from public.profiles where id = auth.uid());
+  v_xp := (select xp from tst.profiles where id = auth.uid());
   insert into public.reposts (post_id) values (v);
   perform tst.eq((select reposts from public.posts where id = v), 1, 'repost increments reposts');
-  perform tst.eq((select xp from public.profiles where id = auth.uid()), v_xp + 3, 'reposting earns 3 XP');
+  perform tst.eq((select xp from tst.profiles where id = auth.uid()), v_xp + 3, 'reposting earns 3 XP');
   perform tst.eq((select price from public.posts where id = v), round(5 + 0.8 * sqrt(2::numeric), 4),
                  'a repost counts double in the price');
   perform tst.throws(format('insert into public.reposts (post_id) values (%s)', v), '23505', 'cannot repost twice');
   delete from public.reposts where post_id = v;
   perform tst.eq((select reposts from public.posts where id = v), 0, 'un-repost decrements reposts');
   insert into public.reposts (post_id) values (v);
-  perform tst.eq((select xp from public.profiles where id = auth.uid()), v_xp + 3, 'reposting again gives no more XP');
+  perform tst.eq((select xp from tst.profiles where id = auth.uid()), v_xp + 3, 'reposting again gives no more XP');
   perform tst.eq((select reposts from json_to_record(public.my_stats()) as s(reposts int)), 1, 'my_stats counts reposts');
   perform tst.throws(format('insert into public.reposts (user_id, post_id) values (%L, %s)', tst.uid('carol'), v),
                      '42501', 'cannot repost as someone else');
@@ -166,11 +166,11 @@ declare
 begin
   v := tst.post('alice', 'Reply to me');
   perform tst.login('bob');
-  v_xp := (select xp from public.profiles where id = auth.uid());
+  v_xp := (select xp from tst.profiles where id = auth.uid());
   insert into public.replies (post_id, body) values (v, long_body) returning id into rid;
   perform tst.eq((select author_id from public.replies where id = rid), tst.uid('bob'), 'reply author is the caller');
   perform tst.eq((select replies from public.posts where id = v), 1, 'reply increments replies');
-  perform tst.eq((select xp from public.profiles where id = auth.uid()), v_xp + 8, 'replying earns 8 XP');
+  perform tst.eq((select xp from tst.profiles where id = auth.uid()), v_xp + 8, 'replying earns 8 XP');
   perform tst.eq(tst.count(format('select id, post_id, author_id, body, created_at from public.replies where post_id = %s', v)),
                  1::bigint, 'replies are readable with the columns the client selects');
 
@@ -264,11 +264,11 @@ declare
   n int;
 begin
   perform tst.login('bob');
-  v_xp := (select xp from public.profiles where id = auth.uid());
+  v_xp := (select xp from tst.profiles where id = auth.uid());
   insert into public.follows (followee) values (tst.uid('alice'));
   perform tst.eq((select followers_count from public.profiles where id = tst.uid('alice')), 1, 'follow increments followers_count');
   perform tst.eq((select following_count from public.profiles where id = tst.uid('bob')), 1, 'follow increments following_count');
-  perform tst.eq((select xp from public.profiles where id = auth.uid()), v_xp + 3, 'following earns 3 XP');
+  perform tst.eq((select xp from tst.profiles where id = auth.uid()), v_xp + 3, 'following earns 3 XP');
   perform tst.eq(tst.count(format('select followee from public.follows where follower = %L', tst.uid('bob'))), 1::bigint,
                  'I can list who I follow');
   perform tst.throws(format('insert into public.follows (followee) values (%L)', tst.uid('alice')), '23505', 'cannot follow twice');
@@ -280,7 +280,7 @@ begin
   perform tst.eq((select followers_count from public.profiles where id = tst.uid('alice')), 0, 'unfollow decrements followers_count');
   perform tst.eq((select following_count from public.profiles where id = tst.uid('bob')), 0, 'unfollow decrements following_count');
   insert into public.follows (followee) values (tst.uid('alice'));
-  perform tst.eq((select xp from public.profiles where id = auth.uid()), v_xp + 3, 'refollowing gives no more XP');
+  perform tst.eq((select xp from tst.profiles where id = auth.uid()), v_xp + 3, 'refollowing gives no more XP');
 
   perform tst.login('alice');
   select count(*) into n from public.notifications where kind = 'follow' and actor_id = tst.uid('bob');
@@ -404,5 +404,87 @@ begin
   update public.posts set body = 'volatile!' where id = v;
   perform tst.eq((select array_length(price_history, 1) from public.posts where id = v), 40,
                  'editing the body does not touch the price');
+end $$;
+rollback;
+
+-- Reply churn: deleted replies still count toward 10 a minute.
+begin;
+do $$
+declare
+  v bigint;
+  rid bigint;
+begin
+  v := tst.post('alice', 'reply churn target');
+  perform tst.login('frank');
+  for i in 1..10 loop
+    insert into public.replies (post_id, body) values (v, 'you are awful #' || i) returning id into rid;
+    delete from public.replies where id = rid;
+  end loop;
+  perform tst.throws(format('insert into public.replies (post_id, body) values (%s, %L)', v, 'eleventh'), 'slow_down',
+                     'replying and deleting still counts toward 10 a minute');
+end $$;
+rollback;
+
+begin;
+insert into public.write_log (user_id, kind, created_at)
+select tst.uid('frank'), 'reply', now() - interval '3 hours' from generate_series(1, 300);
+do $$
+declare
+  v bigint := tst.post('alice', 'reply day cap');
+begin
+  perform tst.login('frank');
+  perform tst.throws(format('insert into public.replies (post_id, body) values (%s, %L)', v, 'reply 301'), 'slow_down',
+                     'reply 301 of the day is slow_down');
+end $$;
+rollback;
+
+-- At most 20 reply notifications an hour from one person to another.
+begin;
+do $$
+declare
+  v bigint := tst.post('alice', 'notification cap target');
+begin
+  insert into public.notifications (user_id, actor_id, kind, post_id, data, created_at)
+  select tst.uid('alice'), tst.uid('frank'), 'reply', v, '{"excerpt":"x"}', now() - interval '10 minutes'
+    from generate_series(1, 19);
+  perform tst.login('frank');
+  insert into public.replies (post_id, body) values (v, 'twentieth');
+  insert into public.replies (post_id, body) values (v, 'twenty-first');
+  perform tst.logout();
+  perform tst.eq((select count(*)::int from public.notifications where user_id = tst.uid('alice') and actor_id = tst.uid('frank')), 20,
+                 'the 21st reply in an hour sends no notification');
+  perform tst.eq((select replies from public.posts where id = v), 2, 'the replies themselves still post');
+  perform tst.login('bob');
+  insert into public.replies (post_id, body) values (v, 'bob joins in');
+  perform tst.logout();
+  perform tst.eq((select count(*)::int from public.notifications where user_id = tst.uid('alice') and actor_id = tst.uid('bob')), 1,
+                 'the cap is per person');
+end $$;
+rollback;
+
+-- Blocking someone hides the notifications they already sent, and the unread count.
+begin;
+do $$
+declare
+  v bigint := tst.post('bob', 'bob post for blocked notes');
+begin
+  perform tst.login('frank');
+  insert into public.replies (post_id, body) values (v, 'you are awful #1');
+  perform tst.login('carol');
+  insert into public.reactions (post_id, kind) values (v, 'like');
+  perform tst.login('bob');
+  perform tst.eq(tst.count('select id from public.notifications'), 2::bigint, 'setup: two notifications');
+  perform tst.eq(public.unread_count(), 2, 'setup: two unread');
+  insert into public.blocks (blocked) values (tst.uid('frank'));
+  perform tst.eq(tst.count(format('select id from public.notifications where actor_id = %L', tst.uid('frank'))), 0::bigint,
+                 'notifications from someone you blocked are hidden');
+  perform tst.eq(tst.count('select id from public.notifications'), 1::bigint, 'others stay');
+  perform tst.eq(public.unread_count(), 1, 'unread_count leaves them out');
+  delete from public.blocks where blocked = tst.uid('frank');
+  perform tst.eq(public.unread_count(), 2, 'unblocking shows them again');
+  perform tst.login('frank');
+  insert into public.blocks (blocked) values (tst.uid('bob'));
+  perform tst.login('bob');
+  perform tst.eq(public.unread_count(), 1, 'it works when they blocked you too');
 end $$;
 rollback;

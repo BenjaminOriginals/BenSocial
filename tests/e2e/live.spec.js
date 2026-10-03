@@ -90,8 +90,19 @@ async function main() {
     await ua.page.fill('#composeText', POST1);
     await ua.page.click('#composeForm [data-act="mood"][data-arg="spicy"]');
     eq(await ua.page.getAttribute('#composeForm [data-act="mood"][data-arg="spicy"]', 'aria-pressed'), 'true', 'mood chip is pressed');
-    await withResponse(ua.page, tablePath('posts', 'POST'), () => ua.page.click('#composeForm button:not([type])'));
+    // A slow connection and an impatient double submit: the post goes out once.
+    const slowPost = u => u.pathname === '/rest/v1/posts';
+    const delayPost = async route => { if (route.request().method() === 'POST') await new Promise(r => setTimeout(r, 400)); await route.continue(); };
+    await ua.ctx.route(slowPost, delayPost);
+    await withResponse(ua.page, tablePath('posts', 'POST'), async () => {
+      await ua.page.click('#composeForm button:not([type])');
+      await ua.page.evaluate(() => { const f = document.getElementById('composeForm'); f.requestSubmit(); f.requestSubmit(); });
+      await ua.page.keyboard.press('Enter');
+    });
     await toast(ua.page, 'Posted.');
+    await ua.ctx.unroute(slowPost, delayPost);
+    await ua.page.waitForTimeout(300);
+    eq(await db.val('select count(*)::int from public.posts where author_id = $1', [A.id]), 1, 'submitting again while the post is on its way posts once');
     const p1 = await db.one('select * from public.posts where author_id = $1', [A.id]);
     const pid = p1 && String(p1.id);
     check(!!pid, 'post row exists');
@@ -148,10 +159,32 @@ async function main() {
     await ub.page.waitForSelector(postSel(pid));
     const pv = await viewText(ub.page);
     check(pv.includes(A.name) && pv.includes('@' + A.handle), 'person view shows name and handle');
-    check(/1\s+followers/.test(pv) && /0\s+following/.test(pv), 'person view shows follower counts from the server');
+    check(/1\s+follower\b/.test(pv) && !/1\s+followers/.test(pv) && /0\s+following/.test(pv), 'person view shows follower counts from the server, in the singular for 1');
     eq(await textOf(ub.page, '#view .person-tools [data-act="follow"]'), 'Following', 'person view shows Following');
     eq(await ub.page.evaluate(() => location.hash), '#person:' + A.id, 'person view has its own address');
+    await ub.page.click('#view .follow-counts [data-act="followList"][data-arg="followers"]');
+    await ub.page.locator('#modalBody .person-row', { hasText: B.name }).waitFor();
+    check((await textOf(ub.page, '#modalBody')).includes('Followers'), 'the follower count opens the list of followers');
+    await ub.page.keyboard.press('Escape');
     await ub.page.click('#view [data-act="goBack"]');
+    await ub.page.waitForSelector(postSel(pid));
+
+    begin('B finds people by name or handle, and by a shared link');
+    await go(ub.page, 'people');
+    await ub.page.locator('#peopleResults .person-row', { hasText: A.name }).waitFor();
+    check((await textOf(ub.page, '#peopleResults')).includes('Newest members'), 'with nothing typed, the newest members are listed');
+    await withResponse(ub.page, rpcPath('search_people'), () => ub.page.fill('#peopleQ', 'lovelace'));
+    await ub.page.waitForFunction(() => /@ada_e2e/.test(document.getElementById('peopleResults').innerText) && /^People/.test(document.getElementById('peopleResults').innerText));
+    check(true, 'a search by name finds A');
+    eq(await textOf(ub.page, `#peopleResults [data-act="follow"][data-id="${A.id}"]`), 'Following', 'results show that B follows A');
+    await withResponse(ub.page, rpcPath('search_people'), () => ub.page.fill('#peopleQ', 'nobody-like-this'));
+    await ub.page.locator('#peopleResults', { hasText: 'Nobody matches' }).waitFor();
+    check(true, 'no match says so');
+    await ub.page.evaluate(h => { location.hash = '#person:@' + h; }, A.handle);
+    await ub.page.waitForFunction(id => location.hash === '#person:' + id, A.id);
+    await ub.page.waitForSelector('#view .person-card');
+    check((await viewText(ub.page)).includes('@' + A.handle), 'a #person:@handle link opens that profile');
+    await go(ub.page, 'feed');
     await ub.page.waitForSelector(postSel(pid));
 
     // ------------------------------------------------------------ algorithm dial
@@ -193,6 +226,26 @@ async function main() {
     eq(await ub.page.getAttribute(dislike, 'aria-pressed'), 'false', 'clear: dislike not pressed');
     eq(await db.val(`select count(*)::int from public.notifications where user_id = $1 and kind = 'like'`, [A.id]), 1, 'A got exactly one like notification');
     eq(await db.val(`select count(*)::int from public.xp_log where user_id = $1 and reason = 'like'`, [B.id]), 1, 'like XP granted once');
+
+    begin('A slow like, then an unlike right after: the last tap wins');
+    const slowReact = u => u.pathname === '/rest/v1/reactions';
+    let held = 0;
+    const holdFirst = async route => { if (route.request().method() === 'POST' && !held++) await new Promise(r => setTimeout(r, 700)); await route.continue(); };
+    await ub.ctx.route(slowReact, holdFirst);
+    const reactReqs = [];
+    const onReq = r => { if (new URL(r.url()).pathname === '/rest/v1/reactions') reactReqs.push(r.method()); };
+    ub.page.on('request', onReq);
+    await ub.page.click(like);
+    await ub.page.waitForTimeout(150);
+    await ub.page.click(like); // Unlike while the like is still on its way.
+    eq(await ub.page.getAttribute(like, 'aria-pressed'), 'false', 'the screen shows the unlike at once');
+    await until(async () => reactReqs.length === 2 && (await reaction()) === null, { timeout: 5000 });
+    ub.page.off('request', onReq);
+    await ub.ctx.unroute(slowReact, holdFirst);
+    eq(reactReqs, ['POST', 'DELETE'], 'the unlike is sent after the like lands, not alongside it');
+    eq(await reaction(), null, 'the database ends with no reaction, like the screen');
+    eq(await counts(), { likes: 0, dislikes: 0 }, 'and the counters agree');
+    eq(await textOf(ub.page, `[data-b="likes:${pid}"]`), '0', 'the screen shows 0 likes');
 
     begin('B reposts, then undoes it');
     const repost = `${postSel(pid)} [data-act="repost"]`;
@@ -252,9 +305,20 @@ async function main() {
     check(notes.includes(`@${B.handle} started following you`), 'Activity shows the follow');
     check(notes.includes(`@${B.handle} liked your post`), 'Activity shows the like');
     check(notes.includes(`@${B.handle} reposted your post`), 'Activity shows the repost');
+    check(await ua.page.locator(`#view .notes [data-act="person"][data-id="${B.id}"]`).count() >= 4, 'each note names B as a link to B\'s profile');
+    check(await ua.page.locator(`#view .notes [data-act="openNote"][data-id="${pid}"][data-arg="reply"]`).isVisible(), 'the reply note links to the reply');
     await until(async () => (await db.val('select count(*)::int from public.notifications where user_id = $1 and not read', [A.id])) === 0);
     eq(await db.val('select count(*)::int from public.notifications where user_id = $1 and not read', [A.id]), 0, 'opening Activity marks notifications read');
     check(await ua.page.locator('#rail [data-me="unread"]').isHidden(), 'unread badge cleared');
+    await ua.page.click(`#view .notes li:has-text("liked your post") [data-act="openNote"]`);
+    await ua.page.waitForFunction(() => location.hash === '#profile');
+    await ua.page.waitForSelector(`#view ${postSel(pid).replace('#view ', '')}.flash`);
+    check(true, 'View post opens the post on A\'s profile');
+    await go(ua.page, 'activity');
+    await ua.page.locator('#view .notes li', { hasText: 'started following you' }).waitFor();
+    await ua.page.click(`#view .notes li:has-text("started following you") [data-act="person"]`);
+    await ua.page.waitForSelector('#view .person-card');
+    check((await viewText(ua.page)).includes('@' + B.handle), 'the name in a follow note opens their profile, to follow back');
 
     // ------------------------------------------------------------ edit + receipt
     begin('A reads the thread, replies to their own post, then deletes that reply');
@@ -304,8 +368,15 @@ async function main() {
     const c0 = await clout(B.id);
     const wantShares = buyShares(before, 100);
     await ub.page.click(`${postSel(pid)} [data-act="pop"][data-arg="back"]`);
-    await withResponse(ub.page, rpcPath('back_post'), () => ub.page.click(`${postSel(pid)} .pop [data-act="back"][data-arg="100"]`));
+    // A slow connection and a double-click: the clout is spent once.
+    const slowBack = u => u.pathname === '/rest/v1/rpc/back_post';
+    const delayBack = async route => { await new Promise(r => setTimeout(r, 400)); await route.continue(); };
+    await ub.ctx.route(slowBack, delayBack);
+    await withResponse(ub.page, rpcPath('back_post'), () => ub.page.dblclick(`${postSel(pid)} .pop [data-act="back"][data-arg="100"]`));
     await toast(ub.page, `Backed @${A.handle} with 100 clout.`);
+    await ub.ctx.unroute(slowBack, delayBack);
+    await ub.page.waitForTimeout(300);
+    eq(ub.requests.filter(x => x.includes('/rpc/back_post')).length, 1, 'a double-click on Back sends one back_post');
     const pos = await db.one('select shares, cost from public.positions where user_id = $1 and post_id = $2', [B.id, pid]);
     near(pos && pos.shares, wantShares, 2e-6, 'shares follow the bonding curve');
     eq(num(pos && pos.cost), 100, 'position cost is 100');
@@ -489,6 +560,36 @@ async function main() {
     await ub.page.waitForSelector(`[data-duel="${nd.id}"]`);
     check((await textOf(ub.page, `[data-duel="${nd.id}"]`)).includes('@' + A.handle), 'B sees the new duel with A linked');
 
+    begin('The admin removes one reply, sees a deleted reply, and resets a profile');
+    const tpid = String(await db.val(`insert into public.posts (author_id, body) values ($1, 'A thread for a reply report.') returning id`, [A.id]));
+    const rrid = String(await db.val(`insert into public.replies (post_id, author_id, body) values ($1, $2, 'A rude reply from B.') returning id`, [tpid, B.id]));
+    const goneId = String(await db.val(`insert into public.replies (post_id, author_id, body) values ($1, $2, 'Something B deleted later.') returning id`, [tpid, B.id]));
+    const rep3 = String(await db.val(`insert into public.reports (reply_id, reason, reporter) values ($1, 'harassment', $2) returning id`, [rrid, A.id]));
+    const rep4 = String(await db.val(`insert into public.reports (reply_id, reason, reporter) values ($1, 'harassment', $2) returning id`, [goneId, A.id]));
+    await db.rows('delete from public.replies where id = $1', [goneId]); // B deletes it after it was reported.
+    const rk = await (await fetch(BASE + '/auth/v1/signup', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', apikey: (await (await fetch(BASE + '/__health')).json()).anonKey },
+      body: JSON.stringify({ email: 'rude@e2e.test', password: PW, data: { handle: 'rude_e2e', name: 'Rude Name' } }),
+    })).json();
+    await db.rows(`update public.profiles set bio = 'An offensive bio.' where id = $1`, [rk.user.id]);
+    const rep5 = String(await db.val(`insert into public.reports (profile_id, reason, reporter) values ($1, 'hate', $2) returning id`, [rk.user.id, A.id]));
+    await withResponse(um.page, rpcPath('mod_open_reports'), () => um.page.click('#view [data-act="modRefresh"]'));
+    const item3 = `#view .mod-item[data-report="${rep3}"]`, item4 = `#view .mod-item[data-report="${rep4}"]`, item5 = `#view .mod-item[data-report="${rep5}"]`;
+    await um.page.waitForSelector(item3);
+    await withResponse(um.page, rpcPath('mod_set_reply_removed'), () => um.page.click(`${item3} [data-act="modRemoveReply"][data-arg="1"]`));
+    await toast(um.page, 'Reply removed.');
+    await um.page.waitForSelector(`${item3} [data-act="modRemoveReply"][data-arg="0"]`);
+    eq(await db.val('select removed from public.replies where id = $1', [rrid]), true, 'Remove reply sets replies.removed');
+    eq(await db.val(`select data->>'action' from public.notifications where user_id = $1 and kind = 'mod' order by id desc limit 1`, [B.id]), 'reply_removed', 'B is told');
+    const it4 = await textOf(um.page, item4);
+    check(it4.includes('Its author deleted it.') && it4.includes('Something B deleted later.'), 'a deleted reply\'s report still shows what it said');
+    check(await um.page.locator(`${item4} [data-act="modBan"][data-id="${B.id}"]`).isVisible(), 'and offers to ban its author');
+    await withResponse(um.page, rpcPath('mod_reset_profile'), () => um.page.click(`${item5} [data-act="modResetProfile"]`));
+    await toast(um.page, 'Profile reset');
+    eq(await db.one('select name, bio from public.profiles where id = $1', [rk.user.id]), { name: 'rude_e2e', bio: '' }, 'Reset name and bio clears the profile');
+    for (const r of [rep3, rep4, rep5]) await db.rows(`update public.reports set status = 'dismissed' where id = $1`, [r]);
+    await db.rows('delete from public.posts where id = $1', [tpid]);
+
     begin('The removed post is gone for B and for A');
     await ub.page.reload(); await waitApp(ub.page);
     await go(ub.page, 'feed');
@@ -547,6 +648,9 @@ async function main() {
     eq((await profile(B.id)).following_count, 0, 'B following_count back to 0');
     await go(ua.page, 'profile');
     check((await textOf(ua.page, '#view .settings-sub')).includes('@' + B.handle), 'Settings lists B under Blocked accounts');
+    await go(ua.page, 'activity');
+    await ua.page.waitForSelector('#view .notes li');
+    check(!(await viewText(ua.page)).includes('@' + B.handle), 'B\'s earlier notifications are hidden after the block');
 
     begin('B no longer sees A');
     await ub.page.reload(); await waitApp(ub.page);
@@ -689,6 +793,18 @@ async function main() {
     for (const x of users) {
       eq(x.requests.filter(r => /\/rest\/v1\/(ads|ad_views)\b|record_ad_view/.test(r)), [], `${x.label}: never touched the ads tables`);
     }
+
+    begin('Other people\'s private profile columns stay private over the API');
+    const tok = await ua.page.evaluate(() => { const k = Object.keys(localStorage).find(x => /^sb-.+-auth-token$/.test(x)); return JSON.parse(localStorage.getItem(k)).access_token; });
+    const apikey = (await (await fetch(BASE + '/__health')).json()).anonKey;
+    const api = q => fetch(BASE + '/rest/v1/' + q, { headers: { apikey, Authorization: 'Bearer ' + tok } });
+    const pub = await api(`profiles?select=handle,name,followers_count&id=eq.${M.id}`);
+    eq([pub.status, (await pub.json())[0].handle], [200, M.handle], 'public columns are readable');
+    for (const col of ['clout', 'earnings_cents', 'last_active', 'active_days', 'is_admin', 'dial', 'accepted_terms_at']) {
+      eq((await api(`profiles?select=handle,${col}&id=eq.${M.id}`)).status, 403, `${col} of another account is refused`);
+    }
+    eq((await api('profiles?select=handle&is_admin=eq.true')).status, 403, 'nobody can list the moderators');
+    for (const x of users) eq(x.requests.filter(r => /\/rest\/v1\/profiles\?select=\*/.test(r)), [], `${x.label}: the app never asks for every profile column`);
 
     // ------------------------------------------------------------ errors
     begin('No page errors');

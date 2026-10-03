@@ -12,19 +12,19 @@ begin
                  'handle from metadata is lowercased');
   perform tst.eq((select name from public.profiles where id = tst.uid('alice')), 'Alice Adams',
                  'name comes from metadata');
-  perform tst.ok((select accepted_terms_at is not null from public.profiles where id = tst.uid('alice')),
+  perform tst.ok((select accepted_terms_at is not null from tst.profiles where id = tst.uid('alice')),
                  'accepted_terms_at is set at sign-up');
   perform tst.ok((select hue between 0 and 359 from public.profiles where id = tst.uid('bob')),
                  'hue is in range');
   perform tst.eq((select hue from public.profiles where id = tst.uid('bob')),
                  ((hashtext(tst.uid('bob')::text) % 360) + 360) % 360,
                  'hue is deterministic from the id');
-  perform tst.eq((select clout from public.profiles where id = tst.uid('bob')), 500.00::numeric,
+  perform tst.eq((select clout from tst.profiles where id = tst.uid('bob')), 500.00::numeric,
                  'new accounts start with 500 clout');
-  perform tst.eq((select xp from public.profiles where id = tst.uid('bob')), 0, 'new accounts start with 0 xp');
-  perform tst.eq((select ad_price_cents from public.profiles where id = tst.uid('bob')), 4,
+  perform tst.eq((select xp from tst.profiles where id = tst.uid('bob')), 0, 'new accounts start with 0 xp');
+  perform tst.eq((select ad_price_cents from tst.profiles where id = tst.uid('bob')), 4,
                  'attention price defaults to 4');
-  perform tst.ok((select not is_admin and not is_banned and not pro from public.profiles where id = tst.uid('bob')),
+  perform tst.ok((select not is_admin and not is_banned and not pro from tst.profiles where id = tst.uid('bob')),
                  'new accounts are not admin, banned or pro');
 end $$;
 

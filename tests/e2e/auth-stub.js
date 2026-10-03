@@ -8,6 +8,7 @@
 //
 // Endpoints (under /auth/v1):
 //   POST /signup                        autoconfirm: returns a session
+//   POST /resend                        a new confirmation link (type signup)
 //   POST /token?grant_type=password
 //   POST /token?grant_type=refresh_token
 //   GET  /user, PUT /user
@@ -17,8 +18,12 @@
 //                                       the app with tokens in the hash
 //   GET  /settings
 // Test-only conventions:
-//   * an email ending in @confirm.test must be confirmed first: /signup
-//     returns no session and sign-in fails with email_not_confirmed.
+//   * an email ending in @confirm.test must be confirmed first, like a
+//     project with "Confirm email" on: /signup returns no session and
+//     sign-in fails with email_not_confirmed. Signing up again with such an
+//     email that is already confirmed answers like GoTrue does then: 200 and
+//     a stand-in user with no identities, no session, no email. (Other
+//     emails behave like "Confirm email" off: a duplicate is 422.)
 //   * GET /__test/links?email=... returns the latest confirmation and
 //     recovery links for that address (the emails the stub never sends).
 // Access tokens are HS256 JWTs signed with the secret PostgREST checks.
@@ -104,11 +109,23 @@ function createAuth({ pool, secret }) {
     last_sign_in_at: u.last_sign_in_at,
     app_metadata: u.raw_app_meta_data || { provider: 'email', providers: ['email'] },
     user_metadata: u.raw_user_meta_data || {},
-    identities: [],
+    identities: [{
+      identity_id: u.id, id: u.id, user_id: u.id, provider: 'email',
+      identity_data: { sub: u.id, email: u.email, email_verified: !!u.email_confirmed_at },
+      created_at: u.created_at, updated_at: u.updated_at,
+    }],
     created_at: u.created_at,
     updated_at: u.updated_at,
     is_anonymous: false,
   });
+  // What GoTrue returns for a sign-up with an email that already has a confirmed account while
+  // "Confirm email" is on: a made-up user with no identities, so nobody can probe for accounts.
+  const obfuscatedUser = (email, meta) => {
+    const now = new Date().toISOString();
+    return { id: crypto.randomUUID(), aud: 'authenticated', role: 'authenticated', email, phone: '',
+      confirmation_sent_at: now, app_metadata: { provider: 'email', providers: ['email'] }, user_metadata: meta,
+      identities: [], created_at: now, updated_at: now, is_anonymous: false };
+  };
 
   function issueSession(u, issuer, sessionId = crypto.randomUUID()) {
     const now = Math.floor(Date.now() / 1000);
@@ -169,8 +186,14 @@ function createAuth({ pool, secret }) {
     const email = String(body.email || '').trim().toLowerCase(), password = String(body.password || '');
     if (!EMAIL_RE.test(email)) throw new AuthError(400, 'email_address_invalid', 'Unable to validate email address: invalid format');
     if (password.length < 6) throw new AuthError(422, 'weak_password', 'Password should be at least 6 characters.');
-    if (await userByEmail(email)) throw new AuthError(422, 'user_already_exists', 'User already registered');
     const meta = body.data && typeof body.data === 'object' && !Array.isArray(body.data) ? body.data : {};
+    const existing = await userByEmail(email);
+    if (existing) {
+      if (!NEEDS_CONFIRM.test(email)) throw new AuthError(422, 'user_already_exists', 'User already registered');
+      if (existing.email_confirmed_at) return obfuscatedUser(email, meta);
+      makeLink(existing, 'signup', issuer, redirectTo); // Not confirmed yet: GoTrue sends the link again.
+      return userJson(existing);
+    }
     const r = await pool.query(
       `insert into auth.users (instance_id, aud, role, email, encrypted_password, email_confirmed_at,
                                raw_app_meta_data, raw_user_meta_data, last_sign_in_at)
@@ -187,6 +210,13 @@ function createAuth({ pool, secret }) {
       return userJson(u);
     }
     return issueSession(u, issuer);
+  }
+
+  async function resend(body, issuer, redirectTo) {
+    if (body.type !== 'signup') throw new AuthError(400, 'validation_failed', 'Missing one of these types: signup, email_change');
+    const u = body.email ? await userByEmail(String(body.email).trim()) : null;
+    if (u && !u.email_confirmed_at) makeLink(u, 'signup', issuer, redirectTo);
+    return {}; // Same answer either way.
   }
 
   async function recover(body, issuer, redirectTo) {
@@ -287,6 +317,7 @@ function createAuth({ pool, secret }) {
       if (m === 'PUT' && path === '/user') return send(200, await updateUser(req, body));
       if (m === 'POST' && path === '/logout') { logout(req, query.get('scope') || 'global'); return send(204); }
       if (m === 'POST' && path === '/recover') return send(200, await recover(body, issuer, redirectTo));
+      if (m === 'POST' && path === '/resend') return send(200, await resend(body, issuer, redirectTo));
       if (m === 'GET' && path === '/verify') {
         res.writeHead(303, { Location: await verify(query, issuer), 'Cache-Control': 'no-store' });
         res.end();

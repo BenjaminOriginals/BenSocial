@@ -8,11 +8,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=DM+Mono:wght@400;500&family=Onest:wght@400;500;600;700&display=swap">
 <style>
-/* Layout: three-column app shell (nav rail · feed column · live rail) that collapses to one column with a bottom tab bar on phones. */
+/* Layout: three-column app shell (nav rail · feed column · live rail) that collapses to one column with a bottom tab bar on phones.
+   Text colors (--fg, --muted, --faint, --gain, --loss) keep at least 4.5:1 contrast on --bg, --surface and --surface-2 in both themes. */
 :root{
   color-scheme: dark;
   --bg:#141019; --surface:#1C1723; --surface-2:#27212F; --line:#352D41;
-  --fg:#F3EFF8; --muted:#AAA0B9; --faint:#726983;
+  --fg:#F3EFF8; --muted:#AAA0B9; --faint:#9289A3;
   --accent:#FFD23F; --accent-ink:#1E1704; --accent-text:#FFD23F; --accent-soft:rgba(255,210,63,.13);
   --love:#FF6B8B; --gain:#3DDC97; --loss:#FF6767; --danger:#FF6767; --danger-ink:#2A0606;
   --paper:#FBF7EC; --paper-ink:#2A251C; --paper-line:#CFC6B2;
@@ -27,9 +28,9 @@
   :root:not([data-theme="dark"]){
     color-scheme: light;
     --bg:#F5F2F8; --surface:#FFFFFF; --surface-2:#EEE9F3; --line:#DED6E7;
-    --fg:#1C1623; --muted:#625872; --faint:#978DA6;
+    --fg:#1C1623; --muted:#625872; --faint:#6F6680;
     --accent:#FFD23F; --accent-ink:#1E1704; --accent-text:#8C6500; --accent-soft:rgba(255,196,0,.22);
-    --love:#D92D57; --gain:#0B8F58; --loss:#D33434; --danger:#C42B2B; --danger-ink:#FFFFFF;
+    --love:#D92D57; --gain:#08774A; --loss:#D33434; --danger:#C42B2B; --danger-ink:#FFFFFF;
     --paper:#FFFDF5; --paper-ink:#2A251C; --paper-line:#D9D0BC;
     --f1:#2F6FE0; --f2:#0F9488; --f3:#E0601E; --f4:#D23D95; --f5:#7552E0; --f6:#C99A00;
     --shadow:0 16px 36px rgba(48,24,72,.14); --scrim:rgba(30,20,40,.45);
@@ -38,9 +39,9 @@
 :root[data-theme="light"]{
   color-scheme: light;
   --bg:#F5F2F8; --surface:#FFFFFF; --surface-2:#EEE9F3; --line:#DED6E7;
-  --fg:#1C1623; --muted:#625872; --faint:#978DA6;
+  --fg:#1C1623; --muted:#625872; --faint:#6F6680;
   --accent:#FFD23F; --accent-ink:#1E1704; --accent-text:#8C6500; --accent-soft:rgba(255,196,0,.22);
-  --love:#D92D57; --gain:#0B8F58; --loss:#D33434; --danger:#C42B2B; --danger-ink:#FFFFFF;
+  --love:#D92D57; --gain:#08774A; --loss:#D33434; --danger:#C42B2B; --danger-ink:#FFFFFF;
   --paper:#FFFDF5; --paper-ink:#2A251C; --paper-line:#D9D0BC;
   --f1:#2F6FE0; --f2:#0F9488; --f3:#E0601E; --f4:#D23D95; --f5:#7552E0; --f6:#C99A00;
   --shadow:0 16px 36px rgba(48,24,72,.14); --scrim:rgba(30,20,40,.45);
@@ -447,6 +448,24 @@ button.side-who:hover b{text-decoration:underline;text-underline-offset:3px}
 .rules li::marker{font:500 13px var(--font-mono);color:var(--muted)}
 .rules b{color:var(--fg)}
 
+/* Long single-word names wrap instead of pushing the page wider than the screen. */
+.profile-name>span,.post-head .name-btn,.reply-who .name-btn,.side-who span,.person-row-text .name-btn,.notes li>span,.mod-meta>span,.toast>span{min-width:0;overflow-wrap:anywhere}
+.post-head .name-btn{max-width:100%}
+.profile-card>.person-tools{flex:none;flex-wrap:wrap}
+
+/* Live mode: finding people, follower lists */
+.search-form{margin-bottom:16px}
+.search-form .field{width:100%;border-radius:12px;padding:11px 14px;font-size:16px}
+.people-list{display:flex;flex-direction:column}
+.person-row{padding:10px 0;border-top:1px solid var(--line)}
+.person-row:first-child{border-top:0}
+.person-row>.me-row{flex:1}
+.person-row-text{display:flex;flex-direction:column;min-width:0}
+.person-row-text .muted{overflow-wrap:anywhere}
+.count-btn{color:inherit;border-radius:6px;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.count-btn:hover{text-decoration-color:currentColor}
+.count-btn b{color:var(--fg);font:500 15px var(--font-mono);font-variant-numeric:tabular-nums}
+
 /* Live mode: sign-in and status screens, moderation */
 #gate{min-height:100dvh;display:grid;place-items:center;padding:24px 16px}
 body[data-gate] .skip,body[data-gate] .ticker,body[data-gate] .topbar,body[data-gate] .shell,body[data-gate] .tabbar{display:none!important}
@@ -568,12 +587,22 @@ const BACKEND = {
   supabaseUrl: '',   // Supabase → Project Settings → Data API → Project URL, e.g. https://abcd1234.supabase.co
   supabaseKey: '',   // Supabase → Project Settings → API Keys → Publishable key (starts with sb_publishable_)
 };
+/* Your legal pages and contact address. Fill these in before you invite the public (docs/GO-LIVE.md, step 7).
+   Links appear on sign-up, in Settings and in the Community Guidelines. Leave empty to hide them. */
+const LEGAL = {
+  termsUrl: '',      // e.g. https://example.com/terms
+  privacyUrl: '',    // e.g. https://example.com/privacy
+  contactEmail: '',  // e.g. help@example.com, for abuse and legal requests
+};
 // Test hooks: a page can set these before this script runs to point the app at another stack.
 if (window.BENSOCIAL_BACKEND) Object.assign(BACKEND, window.BENSOCIAL_BACKEND);
+if (window.BENSOCIAL_LEGAL) Object.assign(LEGAL, window.BENSOCIAL_LEGAL);
 // Older Supabase projects call the public key "anon". Either field name works.
 if (!BACKEND.supabaseKey && BACKEND.supabaseAnonKey) BACKEND.supabaseKey = BACKEND.supabaseAnonKey;
+// The same file from two CDNs. The hash pins its exact bytes, so either copy is safe. Change all three together.
 const SUPABASE_CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js';
-const SUPABASE_SRI = 'sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok'; // Hash of that exact file. Change both together.
+const SUPABASE_CDN_2 = 'https://unpkg.com/@supabase/supabase-js@2.117.2/dist/umd/supabase.js';
+const SUPABASE_SRI = 'sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok';
 const SUPABASE_SRC = window.BENSOCIAL_SUPABASE_SRC || SUPABASE_CDN;
 const LIVE = Boolean(BACKEND.supabaseUrl && BACKEND.supabaseKey);
 
@@ -594,6 +623,7 @@ const money = c => (c < 0 ? '−$' : '$') + (Math.abs(c) / 100).toFixed(2);
 const cents = c => (Math.round(c * 10) / 10).toFixed(1) + '¢';
 const fmt = n => { n = Math.round(n); if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M'; if (n >= 1e4) return Math.round(n / 1e3) + 'K'; if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K'; return String(n); };
 const pct = c => (c >= 0 ? '▲' : '▼') + Math.abs(c * 100).toFixed(1) + '%';
+const plural = (n, word) => Math.round(n) === 1 ? word : word + 's';
 const ago = t => { const m = Math.max(0, (Date.now() - t) / 6e4); if (m < 1) return 'now'; if (m < 60) return Math.floor(m) + 'm'; const h = m / 60; if (h < 24) return Math.floor(h) + 'h'; return Math.floor(h / 24) + 'd'; };
 const dayKey = (d = new Date()) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 const short = (t, n = 48) => t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t;
@@ -634,6 +664,8 @@ const ICONS = {
   flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>',
   mute: '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>',
   block: '<circle cx="12" cy="12" r="9.5"/><line x1="5.3" y1="5.3" x2="18.7" y2="18.7"/>',
+  search: '<circle cx="11" cy="11" r="7"/><line x1="20.5" y1="20.5" x2="16" y2="16"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5"/>',
 };
 const ic = (n, s = 18) => `<svg class="i" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]}</svg>`;
 
@@ -742,7 +774,8 @@ const HANDLE_RE = /^[a-z0-9._]{3,20}$/;
 
 const AD_SHARE = 0.7, TIP_FEE = 0.08, HIST = 40, TICK_MS = 3500, KEY = 'bensocial.v2';
 const LIVE_KEY = 'bensocial.live.v1', POLL_MS = 30000;
-const PAY_MSG = "Payments aren't connected yet. See docs/GO-LIVE.md.";
+// Live mode with payments on, but no payment processor connected yet (see docs/GO-LIVE.md, "Before flipping payments").
+const PAY_MSG = "Payments aren't available yet.";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Live mode: the Supabase client, who is signed in, and caches filled from the backend.
 // In demo mode MY_ID stays 'me' and phase stays 'app'.
@@ -777,7 +810,7 @@ function seed() {
     me: { name: 'You', handle: 'you', hue: 48, bio: '', xp: 0, clout: 500, cash: 340, earned: 0, followers: 0, streak: 0, lastDay: null, days: [], dropDay: null, pro: false, joined: now },
     dial: { ...PRESETS.balanced }, myPresets: [],
     follows: ['maya', 'jun', 'kofi', 'priya'], muted: [], blocked: [], fans: [], reports: [],
-    posts: SEED_POSTS.filter(switchedOn).map(p => mkPost(p, now)),
+    posts: SEED_POSTS.filter(switchedOn).map(p => mkPost(p, now)), seeded: SEED_POSTS.filter(switchedOn).map(p => p.id),
     duels: DUEL_POOL.slice(0, 3).map(d => mkDuel(d, now)),
     holdings: {}, adPrice: 4, badges: [],
     ledger: [{ t: now, label: 'Starter balance (demo money)', c: 340, k: 'pay' }],
@@ -787,6 +820,19 @@ function seed() {
     view: 'feed', tab: 'foryou', theme: null, welcomed: false, draft: '', incomingIx: 0,
   };
 }
+// Seed posts tagged `needs` follow the switches in a saved demo too: a switch turned off takes its post out,
+// and turned on brings it in. `seeded` remembers which seed posts were added, so one that scrolled out stays out.
+function syncSeedPosts(s) {
+  if (!Array.isArray(s.seeded)) s.seeded = SEED_POSTS.filter(p => s.posts.some(x => x.id === p.id)).map(p => p.id);
+  const off = new Set(SEED_POSTS.filter(p => !switchedOn(p)).map(p => p.id));
+  s.posts = s.posts.filter(p => !off.has(p.id));
+  s.seeded = s.seeded.filter(id => !off.has(id));
+  const now = Date.now();
+  for (const p of SEED_POSTS) {
+    if (!switchedOn(p) || s.seeded.includes(p.id)) continue;
+    s.posts.push(mkPost(p, now)); s.seeded.push(p.id);
+  }
+}
 function load() {
   try {
     const raw = localStorage.getItem(KEY);
@@ -795,6 +841,7 @@ function load() {
       if (s && s.v === 2 && Array.isArray(s.posts)) {
         for (const k of ['blocked', 'fans', 'reports', 'muted', 'follows']) if (!Array.isArray(s[k])) s[k] = [];
         s.me.bio = s.me.bio || '';
+        syncSeedPosts(s);
         return s;
       }
     }
@@ -841,7 +888,7 @@ function save() { clearTimeout(saveTimer); saveTimer = setTimeout(writeStore, 30
 const UI = { why: new Set(), open: new Set(), pop: null, editing: null, mood: null, incoming: [], seenAds: new Set(), rank: new Map(), resetArmed: false, editProfile: false, lastFocus: null,
   menu: null, confirm: null, person: null, from: null, reportDraft: null,
   // Live mode only.
-  personState: null, personPosts: null, mod: null, adZero: new Set(), handleCheck: null, confirmAccount: false, authTab: 'signin', notesLoading: false, quiet: false };
+  personState: null, personPosts: null, mod: null, adZero: new Set(), handleCheck: null, confirmAccount: false, authTab: 'signin', notesLoading: false, quiet: false, people: null };
 
 /* ---------- derived ---------- */
 const meUser = () => ({ name: S.me.name, handle: S.me.handle, hue: S.me.hue, bio: S.me.bio, followers: S.me.followers, following: S.follows.length });
@@ -903,7 +950,7 @@ function feedPosts() {
   return ranked();
 }
 const eligibleAds = () => ADS_ON ? adList().filter(a => a.bid >= S.adPrice).sort((a, b) => b.bid - a.bid) : [];
-const visibleNotes = () => S.notes.filter(kindOn);
+const visibleNotes = () => S.notes.filter(n => kindOn(n) && !(n.actor && isBlocked(n.actor))); // Blocking hides their notes at once.
 const unread = () => LIVE ? UNREAD : visibleNotes().filter(n => !n.read).length;
 // What a position would sell for right now. Live mode follows the server's bonding curve: selling h shares
 // pays h × price − 0.025 × h² (sell_position in supabase/schema.sql), so a fresh position is worth what it cost.
@@ -1046,9 +1093,9 @@ const demoApi = {
     return { lead: d[side].v >= d[side === 'a' ? 'b' : 'a'].v };
   },
   claimDrop() {
-    const amount = randi(40, 160) * (isPro() ? 2 : 1);
+    const doubled = isPro(), amount = randi(40, 160) * (doubled ? 2 : 1);
     S.me.clout += amount; S.me.dropDay = dayKey(); gainXP(20);
-    return amount;
+    return { amount, doubled };
   },
   saveProfile({ name, handle, bio }) { S.me.name = name; S.me.handle = handle; S.me.bio = bio; },
 
@@ -1088,9 +1135,14 @@ const ERRORS = {
   blocked: "You can't do that. One of you has blocked the other.",
   not_allowed: "You can't ban yourself.",
   bad_status: "That isn't a valid report status.",
+  ads_off: "Ads aren't running right now.",
+  edit_limit: 'This post has been edited 50 times, the most it can be. Write a new post instead.',
+  name_reserved: "Names can't include BenSocial. Pick another name.",
   payments_off: PAY_MSG,
 };
 const GENERIC_ERR = 'Something went wrong. Try again.';
+// The API refused the key in BACKEND. Only the site owner can fix it, so say where.
+const SETUP_ERR = "BenSocial can't connect to its database. If you run this site, check supabaseUrl and supabaseKey in index.html.";
 function errMsg(e) {
   if (!e) return GENERIC_ERR;
   const ctx = e.ctx || {}, msg = String(e.message || e.error_description || e).trim(), code = String(e.code || '');
@@ -1099,6 +1151,7 @@ function errMsg(e) {
   if (code === '23514' || code === '22001' || code === '23502') return ctx.check || "That's empty or too long. Check it and try again.";
   if (code === '42501') return "You don't have permission to do that.";
   if (code === 'PGRST116') return ctx.not_found || ERRORS.not_found;
+  if (/invalid api key|no api key found|secret api key|api key.*(invalid|not allowed)/i.test(msg)) return SETUP_ERR;
   if (code === 'PGRST301' || code === 'PGRST303' || /jwt/i.test(msg)) return 'Your session expired. Sign in again.';
   if (LIVE && /fetch|network|load failed|timed? ?out/i.test(msg)) return "Can't reach BenSocial. Check your connection and try again.";
   return GENERIC_ERR;
@@ -1112,6 +1165,31 @@ async function call(q, ctx) {
   return res ? res.data : null;
 }
 const rpc = (fn, args, ctx) => call(args ? sb.rpc(fn, args) : sb.rpc(fn), ctx);
+// Toggles (like, repost, follow) change the screen at once and keep at most one request per item on its way.
+// Taps made while it travels only change the screen. When it lands, the newest choice is sent if the server
+// doesn't have it yet. So a slow request can never land after a newer one and leave the two out of step.
+//   key: the item. before: a snapshot of local state before this tap. now(): a snapshot now.
+//   val(snap): the value to store. send(value): the query. restore(snap): put local state back. done(value): after a write.
+const SYNC = new Map();
+function syncToggle({ key, before, now, val, send, restore, done, ctx }) {
+  if (SYNC.has(key)) return; // The request on its way sends the newest choice when it lands.
+  const s = { snap: before };
+  SYNC.set(key, s);
+  return (async () => {
+    try {
+      for (;;) {
+        const snap = now(), v = val(snap);
+        if (v === val(s.snap)) return;
+        try { await call(send(v), ctx); }
+        catch (e) {
+          if (!(e && e.code === '23505')) { restore(s.snap); commit(); throw e; } // 23505: already there. Same outcome.
+        }
+        s.snap = snap;
+        if (done) done(v);
+      }
+    } finally { SYNC.delete(key); }
+  })();
+}
 // Optimistic write: the caller already changed local state. Undo it if the backend says no.
 async function optimistic(q, undo, after, ctx) {
   try { await call(q, ctx); }
@@ -1181,8 +1259,9 @@ function mapDuel(r) {
   return { id: String(r.id), title: String(r.title ?? ''), endsAt: Date.parse(r.ends_at), a: side('a'), b: side('b'),
     vote: r.my_side === 'a' || r.my_side === 'b' ? r.my_side : null, settled: !!r.settled };
 }
+// Live notifications name their actor as a link to their profile, so you can follow back or look them up.
 function noteText(n) {
-  const a = n.actor_id ? person(n.actor_id) : null, who = a && !a.ghost ? `<b>@${esc(a.handle)}</b>` : 'Someone';
+  const a = n.actor_id ? person(n.actor_id) : null, who = a && !a.ghost ? nameBtn(n.actor_id, `<b>@${esc(a.handle)}</b>`) : 'Someone';
   const d = n.data && typeof n.data === 'object' ? n.data : {}, p = n.post_id != null ? postById(n.post_id) : null;
   const ex = p ? ` “${esc(short(p.text, 40))}”` : '', title = `“${esc(short(String(d.title || 'A duel'), 80))}”`;
   switch (n.kind) {
@@ -1194,7 +1273,8 @@ function noteText(n) {
     case 'duel_won': return `You called it. ${title} went your way. +${fmt(num(d.clout, 100))} clout`;
     case 'duel_lost': return d.tie ? `${title} ended in a tie.` : `${title} ended. Your side lost this one.`;
     case 'level': return `You reached level ${fmt(num(d.level))}. +${fmt(num(d.bonus))} clout`;
-    case 'mod': return `A moderator removed your post${ex}.`;
+    case 'mod': return d.action === 'reply_removed' ? 'A moderator removed one of your replies.'
+      : d.action === 'profile_reset' ? "A moderator reset your profile's name and bio." : `A moderator removed your post${ex}.`;
     default: return 'There was activity on your account.';
   }
 }
@@ -1227,7 +1307,7 @@ let meTimer = null;
 function refreshMe(delay = 400) { clearTimeout(meTimer); meTimer = setTimeout(() => loadMe().catch(e => console.warn('profile refresh failed', e)), delay); }
 async function loadMe() {
   if (phase !== 'app') return;
-  const [pr, st, n] = await Promise.all([call(sb.from('profiles').select('*').eq('id', MY_ID).maybeSingle()), rpc('my_stats'), rpc('unread_count')]);
+  const [pr, st, n] = await Promise.all([rpc('my_profile'), rpc('my_stats'), rpc('unread_count')]);
   if (phase !== 'app') return;
   const before = levelInfo(S.me.xp).lv, wasAdmin = S.me.admin;
   if (pr) applyProfile(pr);
@@ -1297,8 +1377,12 @@ async function loadNotes() {
   try {
     const rows = await call(sb.from('notifications').select('id, actor_id, kind, post_id, data, read, created_at')
       .eq('user_id', MY_ID).order('created_at', { ascending: false }).limit(50)) || [];
-    await loadPeople(rows.map(r => r.actor_id).filter(Boolean));
-    S.notes = rows.map(r => ({ id: r.id, t: Date.parse(r.created_at), read: !!r.read, text: noteText(r) }));
+    const shown = rows.filter(r => !r.actor_id || !isBlocked(r.actor_id)); // The server hides these too.
+    await loadPeople(shown.map(r => r.actor_id).filter(Boolean));
+    // Notes about one of your posts link to it on your profile.
+    const linked = r => r.post_id != null && ['like', 'reply', 'repost', 'back'].includes(r.kind);
+    S.notes = shown.map(r => ({ id: r.id, t: Date.parse(r.created_at), read: !!r.read, text: noteText(r),
+      post: linked(r) ? String(r.post_id) : null, kind: r.kind, actor: r.actor_id || null }));
   } finally { UI.notesLoading = false; }
 }
 function markRead() {
@@ -1378,18 +1462,20 @@ const liveApi = {
   },
   react(id, kind) {
     const p = postById(id); if (!p) return;
-    const was = { react: p.react, likes: p.likes, dislikes: p.dislikes };
+    const snap = () => ({ react: p.react, likes: p.likes, dislikes: p.dislikes }), before = snap();
     toggleReact(p, kind);
-    const q = p.react ? sb.from('reactions').upsert({ post_id: Number(id), kind: p.react }, { onConflict: 'user_id,post_id' })
-      : sb.from('reactions').delete().eq('user_id', MY_ID).eq('post_id', Number(id));
-    return optimistic(q, () => { Object.assign(p, was); rerenderPost(id); }, p.react === 'like' ? () => refreshMe() : null);
+    return syncToggle({ key: 'react:' + id, before, now: snap, val: x => x.react,
+      send: v => v ? sb.from('reactions').upsert({ post_id: Number(id), kind: v }, { onConflict: 'user_id,post_id' })
+        : sb.from('reactions').delete().eq('user_id', MY_ID).eq('post_id', Number(id)),
+      restore: x => { Object.assign(p, x); rerenderPost(id); }, done: v => { if (v === 'like') refreshMe(); } });
   },
   repost(id) {
     const p = postById(id); if (!p) return;
-    const was = { reposted: p.reposted, reposts: p.reposts };
+    const snap = () => ({ reposted: p.reposted, reposts: p.reposts }), before = snap();
     p.reposted = !p.reposted; p.reposts += p.reposted ? 1 : -1;
-    const q = p.reposted ? sb.from('reposts').insert({ post_id: Number(id) }) : sb.from('reposts').delete().eq('user_id', MY_ID).eq('post_id', Number(id));
-    return optimistic(q, () => { Object.assign(p, was); rerenderPost(id); }, p.reposted ? () => refreshMe() : null);
+    return syncToggle({ key: 'repost:' + id, before, now: snap, val: x => x.reposted,
+      send: v => v ? sb.from('reposts').insert({ post_id: Number(id) }) : sb.from('reposts').delete().eq('user_id', MY_ID).eq('post_id', Number(id)),
+      restore: x => { Object.assign(p, x); rerenderPost(id); }, done: v => { if (v) refreshMe(); } });
   },
   async reply(id, text) {
     const p = postById(id);
@@ -1408,10 +1494,13 @@ const liveApi = {
     const was = S.follows.includes(by);
     if (!was && isBlocked(by)) return;
     const u = PEOPLE.get(by);
-    const set = on => { S.follows = S.follows.filter(x => x !== by); if (on) S.follows.push(by); if (u) u.followers_count = Math.max(0, u.followers_count + (on ? 1 : -1)); };
-    set(!was);
-    const q = was ? sb.from('follows').delete().eq('follower', MY_ID).eq('followee', by) : sb.from('follows').insert({ followee: by });
-    return optimistic(q, () => { set(was); afterFollow(by); }, () => refreshMe(), { blocked: "You can't follow this account." });
+    const snap = () => ({ on: S.follows.includes(by), count: u ? u.followers_count : 0 }), before = snap();
+    S.follows = S.follows.filter(x => x !== by); if (!was) S.follows.push(by);
+    if (u) u.followers_count = Math.max(0, u.followers_count + (was ? -1 : 1));
+    return syncToggle({ key: 'follow:' + by, before, now: snap, val: x => x.on,
+      send: v => v ? sb.from('follows').insert({ followee: by }) : sb.from('follows').delete().eq('follower', MY_ID).eq('followee', by),
+      restore: x => { S.follows = S.follows.filter(y => y !== by); if (x.on) S.follows.push(by); if (u) u.followers_count = x.count; afterFollow(by); },
+      done: () => refreshMe(), ctx: { blocked: "You can't follow this account." } });
   },
   mute(by, on) {
     const was = S.muted.includes(by); if (was === on) return;
@@ -1469,7 +1558,7 @@ const liveApi = {
     catch (e) { if (e && e.message === 'already_claimed') { S.me.dropDay = today; render(); } throw e; }
     S.me.clout = num(r.clout, S.me.clout); S.me.xp = num(r.xp, S.me.xp); S.me.dropDay = today;
     levelUp(before); refreshMe();
-    return num(r.amount);
+    return { amount: num(r.amount), doubled: !!r.doubled && PAY_ON }; // The server doubles it only while payments are on there too.
   },
   async saveProfile({ name, handle, bio }) {
     await call(sb.from('profiles').update({ name, handle, bio }).eq('id', MY_ID), { unique: ERRORS.handle_taken, check: 'Names are 1 to 40 characters and bios up to 160.' });
@@ -1526,7 +1615,7 @@ function postHTML(p) {
           <p class="hint">Edits are public. The current version stays on a receipt anyone can open.</p>
           <div class="row"><button type="button" class="btn ghost sm" data-act="cancelEdit">Cancel</button><button class="btn sm">Save edit</button></div>
         </form>` : `<p class="post-text">${esc(p.text)}</p>`}
-      ${confirming('post', p.id) ? confirmHTML('post', p.id, 'Delete this post?', "It disappears for everyone, along with its edit receipt. Anyone who backed it gets their clout back. This can't be undone.", 'Delete post') : ''}
+      ${confirming('post', p.id) ? confirmHTML('post', p.id, 'Delete this post?', "It disappears for everyone, along with its edit receipt. Anyone who backed it gets their clout back, up to what they paid. This can't be undone.", 'Delete post') : ''}
       ${p.removed ? '<p class="removed-note">Removed by a moderator. Only moderators can see it.</p>' : ''}${editCount(p) ? `<button class="receipt-link" data-act="receipts" data-id="${p.id}">${ic('receipt', 13)} Edited · ${editCount(p) + 1} versions</button>` : ''}
       ${p.poll ? pollHTML(p) : ''}
       <div class="post-meta">
@@ -1630,6 +1719,7 @@ const NAV = [
   { v: 'duels', label: 'Duels', short: 'Duels', icon: 'zap' },
   { v: 'wallet', label: 'Wallet', short: 'Wallet', icon: 'wallet' },
   { v: 'activity', label: 'Activity', short: 'Activity', icon: 'bell' },
+  ...(LIVE ? [{ v: 'people', label: 'Find people', short: 'People', icon: 'search' }] : []),
   { v: 'profile', label: 'Profile', short: 'Profile', icon: 'user' },
   ...(LIVE ? [{ v: 'moderation', label: 'Moderation', short: 'Moderation', icon: 'flag', admin: true }] : []),
 ].filter(n => n.v !== 'wallet' || WALLET_ON);
@@ -1643,7 +1733,10 @@ function feedListHTML() {
     out.push(postHTML(p));
     if (ads.length && (i === 2 || (i > 2 && (i - 2) % 5 === 0))) out.push(adHTML(ads[ai++ % ads.length]));
   });
-  if (!posts.length) out.push(`<div class="empty">${S.tab === 'following' ? 'Nobody you follow has posted yet. Follow people from For you.' : LIVE ? 'No posts yet. Write the first one.' : 'Nothing here yet.'}</div>`);
+  const find = '<button class="link" data-act="go" data-arg="people">Find people to follow</button>';
+  if (!posts.length) out.push(`<div class="empty">${!LIVE ? (S.tab === 'following' ? 'Nobody you follow has posted yet. Follow people from For you.' : 'Nothing here yet.')
+    : S.tab === 'following' ? `Nobody you follow has posted yet. ${find}.`
+    : `Nothing from the last 7 days. ${find}: everything they post shows up here, whenever they posted it. Or write something.`}</div>`);
   return out.join('');
 }
 
@@ -1691,7 +1784,7 @@ const VIEWS = {
     const sub = {
       foryou: `Ranked by <button class="link" data-act="go" data-arg="algo">your algorithm</button>. Tap “Why this?” on any post to see its score.`,
       following: 'People you follow, newest first. No ranking.',
-      latest: 'Everything, newest first. The algorithm is off.',
+      latest: LIVE ? 'The last 7 days, plus everyone you follow, newest first. The algorithm is off.' : 'Everything, newest first. The algorithm is off.',
     }[S.tab];
     return `<div class="view-head"><h1 class="view-title">Home</h1>
       <div class="tabs" role="tablist" aria-label="Feed">${[['foryou', 'For you'], ['following', 'Following'], ['latest', 'Latest']].map(([k, l]) => `<button role="tab" class="tab" aria-selected="${S.tab === k}" data-act="tab" data-arg="${k}">${l}</button>`).join('')}</div></div>
@@ -1735,12 +1828,13 @@ const VIEWS = {
         <div class="kpi"><b data-b="pf:pl" class="${pf.pl >= 0 ? 'up' : 'down'}">${pf.pl >= 0 ? '+' : '−'}${fmt(Math.abs(pf.pl))}</b><span>Profit or loss</span></div>
       </div>
       ${held.length || lost.length ? `<section class="panel"><h2 class="h2">Your positions</h2><div>${held.map(p => marketRow(p, true)).join('')}${lost.map(lostRow).join('')}</div></section>` : ''}
-      <section class="panel"><div class="panel-head"><h2 class="h2">Rising now</h2><span class="fine">${LIVE ? 'Change over recent activity' : 'Change over the last few minutes'}</span></div><div>${rising.length || !LIVE ? rising.map(p => marketRow(p, false)).join('') : '<p class="muted small">No posts yet.</p>'}</div></section>`;
+      <section class="panel"><div class="panel-head"><h2 class="h2">Rising now</h2><span class="fine">${LIVE ? 'Change over recent activity' : 'Change over the last few minutes'}</span></div><div>${rising.length || !LIVE ? rising.map(p => marketRow(p, false)).join('') : '<p class="muted small">Nothing posted in the last 7 days.</p>'}</div></section>`;
   },
 
   duels() {
     return `<div class="view-head"><h1 class="view-title">Duels</h1></div>
-      <p class="lede">Two people, one question, a few hours on the clock. Pick a side to see the split. If your side wins, you get 100 clout.</p>
+      <p class="lede">${LIVE ? 'One question, two sides. Pick one to see the split. If your side wins when it closes, you get 100 clout.'
+        : 'Two people, one question, a few hours on the clock. Pick a side to see the split. If your side wins, you get 100 clout.'}</p>
       ${S.duels.length || !LIVE ? S.duels.map(duelHTML).join('') : '<div class="empty">No duels running right now. Check back soon.</div>'}`;
   },
 
@@ -1781,7 +1875,7 @@ const VIEWS = {
   activity() {
     return `<div class="view-head"><h1 class="view-title">Activity</h1></div>
       <p class="view-sub">${LIVE ? 'Likes, replies, backers, followers and duel results.' : 'Likes, backers, followers and duel results. Everyone here is simulated in this demo.'}</p>
-      ${LIVE && UI.notesLoading && !S.notes.length ? '<div class="empty" role="status">Loading…</div>' : visibleNotes().length ? `<ul class="notes">${visibleNotes().map(n => `<li class="${n.read ? '' : 'unread'}"><span class="dot"></span><span>${n.text}</span><time>${ago(n.t)}</time></li>`).join('')}</ul>` : '<div class="empty">Nothing yet.</div>'}`;
+      ${LIVE && UI.notesLoading && !S.notes.length ? '<div class="empty" role="status">Loading…</div>' : visibleNotes().length ? `<ul class="notes">${visibleNotes().map(n => `<li class="${n.read ? '' : 'unread'}"><span class="dot"></span><span>${n.text}${n.post ? ` <button class="link small" data-act="openNote" data-id="${esc(n.post)}" data-arg="${esc(n.kind)}">${n.kind === 'reply' ? 'View reply' : 'View post'}</button>` : ''}</span><time>${ago(n.t)}</time></li>`).join('')}</ul>` : '<div class="empty">Nothing yet.</div>'}`;
   },
 
   profile() {
@@ -1790,8 +1884,10 @@ const VIEWS = {
     return `<section class="panel">
         <div class="profile-card">${avatar(meUser(), 'lg')}<div>
           <div class="profile-name"><span>${esc(S.me.name)}</span>${isPro() ? '<span class="pro-tag">PRO</span>' : ''}</div>
-          <p class="muted">@${esc(S.me.handle)} · <span data-me="followers">${fmt(S.me.followers)}</span> followers · following ${S.follows.length}</p></div>
-          <button class="btn ghost sm" data-act="editProfile" aria-expanded="${UI.editProfile}">${ic('edit', 14)} Edit profile</button></div>
+          <p class="muted">@${esc(S.me.handle)} · ${LIVE ? `${countBtn(MY_ID, 'followers', S.me.followers, plural(S.me.followers, 'follower'))} · ${countBtn(MY_ID, 'following', S.follows.length, 'following')}`
+            : `<span data-me="followers">${fmt(S.me.followers)}</span> ${plural(S.me.followers, 'follower')} · following ${S.follows.length}`}</p></div>
+          <div class="person-tools">${LIVE ? `<button class="btn ghost sm" data-act="copyProfileLink">${ic('link', 14)} Copy profile link</button>` : ''}
+          <button class="btn ghost sm" data-act="editProfile" aria-expanded="${UI.editProfile}">${ic('edit', 14)} Edit profile</button></div></div>
         ${S.me.bio && !UI.editProfile ? `<p class="bio">${esc(S.me.bio)}</p>` : ''}
         ${UI.editProfile ? `<form data-form="profile" class="form-grid">
           <label>Name<input class="field" id="pf-name" name="name" maxlength="40" value="${esc(S.me.name)}" required></label>
@@ -1818,6 +1914,7 @@ const VIEWS = {
         ${PAY_ON ? `<div class="list-row"><span>BenSocial Pro</span>${S.me.pro ? '<button class="btn ghost sm" data-act="pro">Manage</button>' : '<button class="btn sm" data-act="pro">Try Pro</button>'}</div>` : ''}
         <div class="list-row"><span>Appearance</span><button class="btn ghost sm" data-act="theme">${themeLabel()}</button></div>
         <div class="list-row"><span>Community Guidelines</span><button class="btn ghost sm" data-act="guidelines">Read</button></div>
+        ${legalRowsHTML()}
         ${LIVE ? accountHTML() : `<div class="list-row"><span>Demo data</span><button class="btn ghost sm" data-act="reset">${UI.resetArmed ? 'Tap again to erase everything' : 'Reset demo'}</button></div>`}
         <div class="settings-sub"><h3 class="h3">Blocked accounts</h3>${S.blocked.length
           ? S.blocked.map(by => { const u = person(by); return `<div class="list-row"><span class="me-row">${avatar(u, 'sm', by)}${nameBtn(by, '@' + esc(u.handle))}</span><button class="btn ghost sm" data-act="unblock" data-id="${esc(by)}">Unblock</button></div>`; }).join('')
@@ -1848,12 +1945,24 @@ const VIEWS = {
             ${moreBtn('person:' + id, `More options for @${u.handle}`)}</div>
         </div>
         ${u.bio ? `<p class="bio">${esc(u.bio)}</p>` : ''}
-        <div class="follow-counts"><span><b>${fmt(followersOf(id))}</b> followers</span><span><b>${fmt(followingOf(id))}</b> following</span></div>
+        <div class="follow-counts">${countBtn(id, 'followers', followersOf(id), plural(followersOf(id), 'follower'))}${countBtn(id, 'following', followingOf(id), 'following')}</div>
         ${LIVE && u.banned ? '<p class="note-box">This account is suspended.</p>' : ''}${blocked ? `<p class="note-box">You blocked @${esc(u.handle)}. You won't see each other's posts, and they can't follow you.</p>`
           : isMuted(id) ? `<div class="note-box blocked-note"><span>You muted @${esc(u.handle)}. Their posts stay out of your feed.</span><button class="btn ghost sm" data-act="unmute" data-id="${esc(id)}">Unmute</button></div>` : ''}
       </section>
       ${blocked ? '' : `<h2 class="h2" style="margin:6px 0 12px">Posts</h2>
       <div class="feed">${posts.length ? posts.map(postHTML).join('') : `<div class="empty">@${esc(u.handle)} hasn't posted yet.</div>`}</div>`}`;
+  },
+
+  // Live mode: find people by name or handle. With nothing typed, the newest members.
+  people() {
+    const q = UI.people ? UI.people.q : '';
+    return `<div class="view-head"><h1 class="view-title">Find people</h1></div>
+      <p class="view-sub">Search by name or handle. With nothing typed, you see who joined most recently.</p>
+      <form class="search-form" data-form="people" role="search">
+        <label class="sr-only" for="peopleQ">Search people by name or handle</label>
+        <input class="field" id="peopleQ" name="q" type="search" maxlength="40" value="${esc(q)}" placeholder="Name or @handle" autocomplete="off" autocapitalize="none" spellcheck="false">
+      </form>
+      <section class="panel" id="peopleResults" aria-live="polite">${peopleResultsHTML()}</section>`;
   },
 
   // Live mode, admins only (canView checks). The database enforces it too: every mod_* call raises not_admin otherwise.
@@ -1878,7 +1987,61 @@ const VIEWS = {
   },
 };
 
-if (!LIVE) delete VIEWS.moderation; // Demo mode has no moderators, and no #moderation route.
+if (!LIVE) { delete VIEWS.moderation; delete VIEWS.people; } // Demo mode has no moderators or search, and no routes to them.
+
+// One person in a list (search results, followers): avatar, name, handle, followers, and Follow.
+function personRowHTML(id, follow = true) {
+  const u = person(id), n = followersOf(id);
+  return `<div class="list-row person-row"><span class="me-row">${avatar(u, 'sm', id)}<span class="person-row-text">${nameBtn(id, `<b>${esc(u.name)}</b>`)}<span class="muted small">@${esc(u.handle)} · ${fmt(n)} ${plural(n, 'follower')}</span></span></span>${follow && !isMe(id) && !isBlocked(id) ? `<button class="btn sm ${S.follows.includes(id) ? 'ghost' : ''}" data-act="follow" data-id="${esc(id)}" aria-pressed="${S.follows.includes(id)}">${S.follows.includes(id) ? 'Following' : 'Follow'}</button>` : ''}</div>`;
+}
+function peopleResultsHTML() {
+  const P = UI.people || { q: '', ids: null, loading: true }, q = P.q;
+  const head = `<h2 class="h2">${q ? 'People' : 'Newest members'}</h2>`;
+  if (P.error) return `${head}<p class="note-box">Couldn't search right now. ${esc(P.error)}</p>`;
+  if (!P.ids) return `${head}<p class="muted small" role="status">Searching…</p>`;
+  if (!P.ids.length) return `${head}<p class="muted small">${q ? `Nobody matches “${esc(q)}”.` : 'Nobody else is here yet. Share your profile link from your Profile to invite people.'}</p>`;
+  return head + `<div class="people-list">${P.ids.map(id => personRowHTML(id)).join('')}</div>`;
+}
+let peopleTimer = null, peopleSeq = 0;
+async function searchPeople(q) {
+  const seq = ++peopleSeq;
+  UI.people = { q, ids: UI.people && UI.people.q === q ? UI.people.ids : null };
+  renderPeople();
+  try {
+    const rows = await rpc('search_people', { p_query: q, p_limit: 30 }) || [];
+    if (seq !== peopleSeq) return; // A newer search is on its way.
+    rows.forEach(addPerson);
+    UI.people = { q, ids: rows.map(r => r.id).filter(id => !isMe(id)) };
+  } catch (e) {
+    if (seq !== peopleSeq) return;
+    console.warn(e); UI.people = { q, ids: [], error: errMsg(e) };
+  }
+  renderPeople();
+}
+function renderPeople() {
+  const el = $('#peopleResults');
+  if (el && S.view === 'people') keepFocus(el, () => { el.innerHTML = peopleResultsHTML(); });
+}
+// Followers and following, in a dialog. Live mode reads them from the follows table.
+async function showFollowList(id, which) {
+  const title = which === 'followers' ? 'Followers' : 'Following';
+  openModal(`<div class="sheet"><div><span class="eyebrow">@${esc(person(id).handle)}</span><h2>${title}</h2></div><div id="followListBody"><p class="muted small" role="status">Loading…</p></div></div>`, title);
+  let html;
+  try {
+    const mine = which === 'followers' ? 'followee' : 'follower', theirs = which === 'followers' ? 'follower' : 'followee';
+    const rows = await call(sb.from('follows').select(theirs).eq(mine, id).order('created_at', { ascending: false }).limit(200)) || [];
+    const ids = rows.map(r => r[theirs]);
+    await loadPeople(ids);
+    const shown = ids.filter(x => isMe(x) || (PEOPLE.has(x) && !PEOPLE.get(x).banned && !isBlocked(x)));
+    html = shown.length ? `<div class="people-list">${shown.map(x => personRowHTML(x, false)).join('')}</div>` : '<p class="muted small">Nobody yet.</p>';
+  } catch (e) { console.warn(e); html = `<p class="note-box">Couldn't load the list. ${esc(errMsg(e))}</p>`; }
+  const body = $('#followListBody'); if (body) body.innerHTML = html;
+}
+// A follower count that opens the list in live mode, and plain text in the demo.
+const countBtn = (id, which, n, label) => LIVE
+  ? `<button class="count-btn" data-act="followList" data-id="${esc(id)}" data-arg="${which}"><b>${fmt(n)}</b> ${label}</button>`
+  : `<span><b>${fmt(n)}</b> ${label}</span>`;
+const profileLink = () => location.origin + location.pathname + '#person:@' + S.me.handle;
 
 function modReportsHTML() {
   const M = UI.mod || { rows: [], loading: true }, rows = M.rows;
@@ -1893,13 +2056,16 @@ function modItemHTML(r) {
   const kind = { post: 'Post', reply: 'Reply', profile: 'Profile' }[r.target_kind] || 'Deleted content';
   const who = r.target_handle == null ? '' : ` by ${r.target_user ? nameBtn(r.target_user, '@' + esc(r.target_handle)) : '@' + esc(r.target_handle)}`;
   const btn = (act, id, arg, label, danger) => `<button class="btn ${danger ? 'danger' : 'ghost'} sm" data-act="${act}" data-id="${esc(id)}" data-arg="${arg}">${label}</button>`;
-  const h = esc(r.target_handle || '');
+  const h = esc(r.target_handle || ''), gone = r.target_kind === 'gone';
   return `<article class="mod-item" data-report="${esc(r.report_id)}">
     <div class="mod-meta"><span class="status bad">${esc(reason)}</span><span>${kind}${who}</span>${r.target_banned ? '<span class="status no">Banned</span>' : ''}${r.post_removed ? '<span class="status no">Removed</span>' : ''}<span>Reported by @${esc(r.reporter_handle || 'deleted')} · ${ago(Date.parse(r.created_at))}</span></div>
-    ${r.content != null ? `<p class="mod-content">${esc(r.content)}</p>` : '<p class="muted small">The reported content was deleted.</p>'}
+    ${gone ? `<p class="muted small">${r.content != null ? 'Its author deleted it. This is a copy from when it was reported.' : 'The reported content was deleted.'}</p>` : ''}
+    ${r.content != null ? `<p class="mod-content">${esc(r.content)}</p>` : ''}
     ${r.details ? `<p class="small"><span class="muted">Reporter's note:</span> ${esc(r.details)}</p>` : ''}
     <div class="mod-actions">
       ${r.target_kind === 'post' && r.post_id != null ? (r.post_removed ? btn('modRemove', r.post_id, '0', 'Restore post') : btn('modRemove', r.post_id, '1', 'Remove post', true)) : ''}
+      ${r.target_kind === 'reply' && r.reply_id != null ? (r.post_removed ? btn('modRemoveReply', r.reply_id, '0', 'Restore reply') : btn('modRemoveReply', r.reply_id, '1', 'Remove reply', true)) : ''}
+      ${r.target_kind === 'profile' && r.profile_id != null ? btn('modResetProfile', r.profile_id, '', 'Reset name and bio', true) : ''}
       ${r.target_user && !isMe(r.target_user) ? (r.target_banned ? btn('modBan', r.target_user, '0', `Unban @${h}`) : btn('modBan', r.target_user, '1', `Ban @${h}`, true)) : ''}
       ${btn('modResolve', r.report_id, 'dismissed', 'Dismiss')}
       ${btn('modResolve', r.report_id, 'actioned', 'Mark actioned')}
@@ -1970,7 +2136,7 @@ function duelHTML(d) {
       ${d.vote || ended ? `<span class="eyebrow">${tags}</span>` : `<button class="btn sm block" data-act="vote" data-id="${d.id}" data-arg="${k}">${LIVE ? 'Pick this side' : `Side with ${esc(u.name.split(' ')[0])}`}</button>`}</div>`;
   };
   return `<article class="duel" data-duel="${d.id}">
-    <div class="duel-top"><span class="eyebrow">Duel · <span data-b="left:${d.id}">${timeLeft(d)}</span></span><span class="eyebrow"><span data-b="dvt:${d.id}">${fmt(tot)}</span> votes</span></div>
+    <div class="duel-top"><span class="eyebrow">Duel · <span data-b="left:${d.id}">${timeLeft(d)}</span></span><span class="eyebrow"><span data-b="dvt:${d.id}">${fmt(tot)}</span> ${plural(tot, 'vote')}</span></div>
     <h2>${esc(d.title)}</h2>
     <div class="sides">${side('a')}<span class="vs">VS</span>${side('b')}</div>
     ${d.vote || ended ? `<div class="split" aria-label="${sa}% to ${100 - sa}%"><div class="a" data-b="dsa:${d.id}" style="flex-basis:${sa}%">${sa}%</div><div class="b" data-b="dsb:${d.id}" style="flex-basis:${100 - sa}%">${100 - sa}%</div></div>`
@@ -2013,7 +2179,7 @@ function renderLive() {
   keepFocus(live, () => { live.innerHTML = `${streakCard()}
     ${movers.length || !LIVE ? `<div class="card"><div class="card-head"><span class="eyebrow">Rising on the market</span><button class="link small" data-act="go" data-arg="market">Open</button></div>
       ${movers.map(p => { const u = author(p); return `<button class="mini" data-act="go" data-arg="market">${avatar(u, 'sm')}<span style="min-width:0"><span class="who">@${esc(u.handle)}</span><span class="snip" style="display:block">${esc(p.text)}</span></span>${chgSpan(p)}</button>`; }).join('')}</div>` : ''}
-    ${d ? `<div class="card"><div class="card-head"><span class="eyebrow">Live duel</span><span class="fine">${timeLeft(d)}</span></div><b>${esc(d.title)}</b><p class="small muted">${sideName(d, 'a')} vs ${sideName(d, 'b')} · ${fmt(d.a.v + d.b.v)} votes</p><button class="btn ghost sm" data-act="go" data-arg="duels">${d.vote ? 'See the split' : 'Pick a side'}</button></div>` : ''}
+    ${d ? `<div class="card"><div class="card-head"><span class="eyebrow">Live duel</span><span class="fine">${timeLeft(d)}</span></div><b>${esc(d.title)}</b><p class="small muted">${sideName(d, 'a')} vs ${sideName(d, 'b')} · ${fmt(d.a.v + d.b.v)} ${plural(d.a.v + d.b.v, 'vote')}</p><button class="btn ghost sm" data-act="go" data-arg="duels">${d.vote ? 'See the split' : 'Pick a side'}</button></div>` : ''}
     ${LIVE ? '' : `<p class="fine" style="padding:0 4px">Demo mode: every ${simulated.slice(0, -1).join(', ')} and ${simulated[simulated.length - 1]} here is simulated and stays in this browser.</p>`}`; }, null);
 }
 
@@ -2041,6 +2207,7 @@ function buildShell() {
     </div>`;
   $('#topbar').innerHTML = `<span class="logo">Ben<mark>Social</mark></span><span class="spacer"></span>
     <span class="pill-stat" aria-label="Clout">${ic('diamond', 13)}<span data-me="clout"></span></span>
+    ${LIVE ? `<button class="icon-btn" data-act="go" data-arg="people" aria-label="Find people">${ic('search', 20)}</button>` : ''}
     <button class="icon-btn" data-act="go" data-arg="activity" aria-label="Activity">${ic('bell', 20)}<span class="badge" data-me="unread" hidden></span></button>
     <button class="icon-btn" data-act="go" data-arg="profile" aria-label="Profile">${avatar(meUser(), 'sm')}</button>`;
   $('#tabbar').innerHTML = NAV.filter(n => ['feed', 'algo', 'market', 'duels', 'wallet'].includes(n.v)).map(n => `<button data-act="go" data-arg="${n.v}" data-nav="${n.v}">${ic(n.icon, 22)}<span>${n.short}</span></button>`).join('');
@@ -2112,7 +2279,7 @@ function renderTicker() {
     `<span class="tk"><span class="tk-live">LIVE</span></span>`,
     ...movers.map(p => `<span class="tk"><b>@${esc(author(p).handle)}</b> ${p.price.toFixed(1)} <span class="${chg(p) >= 0 ? 'up' : 'down'}">${pct(chg(p))}</span></span>`),
     ...(ADS_ON ? adList().slice(0, 3).map(a => `<span class="tk"><b>${esc(a.brand)}</b> bids ${cents(a.bid)} per view</span>`) : []),
-    ...S.duels.map(d => `<span class="tk"><b>${esc(d.title)}</b> ${fmt(d.a.v + d.b.v)} votes</span>`),
+    ...S.duels.map(d => `<span class="tk"><b>${esc(d.title)}</b> ${fmt(d.a.v + d.b.v)} ${plural(d.a.v + d.b.v, 'vote')}</span>`),
     ADS_ON ? `<span class="tk">Your price <b>${S.adPrice}¢</b></span>` : '',
   ].join('');
   $('#ticker').innerHTML = items + items;
@@ -2135,7 +2302,14 @@ function observeAds() {
         $$(`[data-ad="${CSS.escape(id)}"] .ad-pay`).forEach(el => { el.classList.add('paid'); el.innerHTML = ic('check', 13) + (pay > 0 ? ' Paid you ' + cents(pay) : ' Already paid today'); });
         if (pay > 0) toast(`+${cents(pay)} from ${esc(a.brand)} for your attention`);
         commit();
-      }, () => UI.seenAds.delete(id));
+      }, e => {
+        // The owner pulled this ad, or turned ads off on the server, after the feed loaded. Drop it quietly.
+        if (LIVE && e && (e.message === 'not_found' || e.message === 'ads_off')) {
+          S.ads = S.ads.filter(x => x.id !== id); renderFeed(); console.warn('ad no longer running', id);
+          return true;
+        }
+        UI.seenAds.delete(id); // Try again next time it scrolls into view.
+      });
     }
   }, { threshold: 0.6 });
   $$('[data-ad]').forEach(el => adObserver.observe(el));
@@ -2287,12 +2461,33 @@ const GUIDELINES = [
   ['Edits are public. Deleting is allowed.', 'Every version of a post stays on its receipt. You can delete your own posts any time.'],
   ['Moderators can step in.', 'They can remove content and ban accounts that break these rules.'],
 ];
+// LEGAL (top of the script): only plain web links and an email address are used. Anything else is ignored.
+const LEGAL_LINKS = {
+  terms: /^https?:\/\/[^\s"'<>]+$/i.test(String(LEGAL.termsUrl || '').trim()) ? String(LEGAL.termsUrl).trim() : '',
+  privacy: /^https?:\/\/[^\s"'<>]+$/i.test(String(LEGAL.privacyUrl || '').trim()) ? String(LEGAL.privacyUrl).trim() : '',
+  email: /^[^\s@"'<>]+@[^\s@"'<>]+\.[^\s@"'<>]+$/.test(String(LEGAL.contactEmail || '').trim()) ? String(LEGAL.contactEmail).trim() : '',
+};
+const legalLink = (url, label) => `<a class="link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+const mailLink = () => `<a class="link" href="mailto:${esc(LEGAL_LINKS.email)}">${esc(LEGAL_LINKS.email)}</a>`;
+// The sign-up consent line. It names the Terms and Privacy Policy once the owner has linked them.
+function consentHTML() {
+  const g = '<button type="button" class="link" data-act="guidelines">Community Guidelines</button>';
+  const t = LEGAL_LINKS.terms && legalLink(LEGAL_LINKS.terms, 'Terms of Service'), p = LEGAL_LINKS.privacy && legalLink(LEGAL_LINKS.privacy, 'Privacy Policy');
+  return `I agree to the ${t ? t + ' and the ' : ''}${g}${p ? `, and I've read the ${p}` : ''}`;
+}
+function legalRowsHTML() {
+  return [
+    LEGAL_LINKS.terms && `<div class="list-row"><span>Terms of Service</span>${legalLink(LEGAL_LINKS.terms, 'Read')}</div>`,
+    LEGAL_LINKS.privacy && `<div class="list-row"><span>Privacy Policy</span>${legalLink(LEGAL_LINKS.privacy, 'Read')}</div>`,
+    LEGAL_LINKS.email && `<div class="list-row account-row"><span>Contact and abuse reports</span>${mailLink()}</div>`,
+  ].filter(Boolean).join('\n        ');
+}
 function guidelinesHTML(from) {
   return `<div class="sheet">
     <div><span class="eyebrow">BenSocial</span><h2>Community Guidelines</h2></div>
     <p class="muted">The short version: treat people like people. These rules cover posts, replies, profiles and duels.</p>
     <ol class="rules">${GUIDELINES.map(([b, t]) => `<li><b>${b}</b> ${t}</li>`).join('')}</ol>
-    <p class="small muted">See something that breaks a rule? Open the ⋯ menu on the post or profile and choose Report.</p>
+    <p class="small muted">See something that breaks a rule? Open the ⋯ menu on the post or profile and choose Report.${LEGAL_LINKS.email ? ` For anything urgent, or a legal request, write to ${mailLink()}.` : ''}</p>
     <div class="row">${from ? `<button class="btn ghost sm" data-act="report" data-id="${esc(from)}" data-arg="resume">${ic('back', 15)} Back to report</button>` : ''}<button class="btn sm" data-act="close">Got it</button></div>
   </div>`;
 }
@@ -2305,8 +2500,24 @@ const canView = v => !!VIEWS[v] && (v !== 'wallet' || WALLET_ON) && (v !== 'pers
 const hashFor = v => v === 'person' ? 'person:' + encodeURIComponent(UI.person) : v;
 function route(h) {
   const m = /^person:(.+)$/.exec(h);
-  if (m) { let id; try { id = decodeURIComponent(m[1]); } catch (e) { return { v: 'feed' }; } return knownPerson(id) && !isMe(id) ? { v: 'person', id } : { v: 'feed' }; }
+  if (m) {
+    let id; try { id = decodeURIComponent(m[1]); } catch (e) { return { v: 'feed' }; }
+    // Live mode also takes #person:@handle, the shareable link from Profile.
+    if (LIVE && /^@[a-z0-9._]{3,20}$/i.test(id)) return { v: 'person', handle: id.slice(1).toLowerCase() };
+    return knownPerson(id) && !isMe(id) ? { v: 'person', id } : { v: 'feed' };
+  }
   return VIEWS[h] ? { v: h } : null;
+}
+// Live mode: open a profile by handle (#person:@handle).
+async function openHandle(h) {
+  if (h === S.me.handle) { go('profile'); return; }
+  let r;
+  try { r = await call(sb.from('profiles').select(PROFILE_COLS).eq('handle', h).maybeSingle()); }
+  catch (e) { failed(e); go('feed'); return; }
+  if (phase !== 'app') return;
+  if (!r) { toast(`Nobody has the handle @${esc(h)}.`); go('feed'); return; }
+  if (isMe(r.id)) { go('profile'); return; }
+  addPerson(r); openPerson(r.id);
 }
 function go(v) {
   if (!canView(v)) v = 'feed';
@@ -2323,10 +2534,12 @@ function enterView(v) {
   const again = name => () => { if (S.view === name) render(); };
   if (v === 'activity') loadNotes().then(again('activity'), e => { failed(e); again('activity')(); });
   else if (v === 'moderation') loadReports();
+  else if (v === 'people') searchPeople(UI.people ? UI.people.q : '');
   else if (v === 'duels') loadDuels().then(() => { again('duels')(); renderTicker(); renderLive(); }, e => console.warn('duels refresh failed', e));
   else if (v === 'person' && UI.person) loadPerson(UI.person);
 }
 function openPerson(id) {
+  closeModal(); // From a followers list.
   if (isMe(id)) { go('profile'); return; }
   if (!knownPerson(id)) return;
   if (S.view !== 'person') UI.from = { view: S.view, y: scrollY };
@@ -2340,12 +2553,33 @@ const paid = fn => (...args) => !PAY_ON ? undefined : LIVE ? toast(PAY_MSG) : fn
 // Actions may be async: live mode awaits the backend inside api.*. Errors land in failed().
 function failed(err) { console.error(err); toast(esc(errMsg(err))); }
 function run(fn, ...args) {
-  try { const r = fn(...args); if (r && typeof r.then === 'function') r.catch(failed); } catch (err) { failed(err); }
+  try { const r = fn(...args); if (r && typeof r.then === 'function') return r.catch(failed); } catch (err) { failed(err); }
+  return null;
 }
-// Runs fn now for a plain value, or when a promise resolves.
-const after = (v, fn, onErr) => v && typeof v.then === 'function' ? v.then(fn, e => { if (onErr) onErr(e); failed(e); }) : fn(v);
+// One at a time: while an action or form waits for the backend, a second click or Enter on the same thing is
+// ignored, so a double-click can't post twice or spend clout twice. Toggles queue instead (syncToggle).
+// btn (forms only) is disabled meanwhile, and gets keyboard focus back if it had it.
+const PENDING = new Set();
+const TOGGLES = new Set(['like', 'dislike', 'repost', 'follow', 'mute', 'unmute', 'menu', 'why', 'pop', 'tab', 'mood', 'go', 'person', 'close']);
+function runOnce(key, btn, fn, ...args) {
+  if (PENDING.has(key)) return;
+  const focused = btn && document.activeElement === btn;
+  const p = run(fn, ...args);
+  if (!p) return;
+  PENDING.add(key);
+  if (btn) busy(btn, true);
+  p.finally(() => {
+    PENDING.delete(key);
+    if (!btn || !btn.isConnected) return;
+    busy(btn, false);
+    if (focused && (!document.activeElement || document.activeElement === document.body)) btn.focus();
+  });
+}
+// Runs fn now for a plain value, or when a promise resolves. onErr can return true when it handled the error itself.
+const after = (v, fn, onErr) => v && typeof v.then === 'function' ? v.then(fn, e => { if (onErr && onErr(e) === true) return; failed(e); }) : fn(v);
 function afterFollow(by) {
   if (S.view === 'person') render();
+  else if (S.view === 'people') renderPeople();
   else $$('[data-post]').forEach(el => { const p = postById(el.dataset.post); if (p && p.by === by) rerenderPost(p.id); });
 }
 
@@ -2508,9 +2742,9 @@ const ACTIONS = {
   },
   drop: async (_, __, el) => {
     if (!dropReady()) return;
-    const amt = await api.claimDrop();
+    const { amount, doubled } = await api.claimDrop();
     burst(el);
-    toast(`Daily drop: +${amt} clout${isPro() ? ' (doubled by Pro)' : ''}. Next one tomorrow.`, { tone: 'accent' });
+    toast(`Daily drop: +${amount} clout${doubled ? ' (doubled by Pro)' : ''}. Next one tomorrow.`, { tone: 'accent' });
     render(); commit();
   },
   preset: (_, k) => { Object.assign(S.dial, PRESETS[k]); S.stats.tuned++; render(); commit(); toast(`${PRESETS[k].label} preset applied.`); },
@@ -2565,9 +2799,18 @@ const ACTIONS = {
     if (!/^\S+@\S+\.\S+$/.test(email)) { formMsg('err', 'Enter your email above first, then choose Forgot password.'); $('#auth-email').focus(); return; }
     busy(el, true);
     const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
-    busy(el, false);
+    busy(el, false); el.focus();
     if (error) formMsg('err', authErr(error));
     else formMsg('ok', 'If an account uses that email, we sent it a link to set a new password.');
+  },
+  resend: async (_, __, el) => {
+    const input = $('#auth-email'), email = input ? input.value.trim() : '';
+    if (!/^\S+@\S+\.\S+$/.test(email)) { formMsg('err', 'Enter your email above first, then send the confirmation email again.'); if (input) input.focus(); return; }
+    busy(el, true);
+    const { error } = await sb.auth.resend({ type: 'signup', email, options: { emailRedirectTo: location.origin + location.pathname } });
+    busy(el, false); el.focus();
+    if (error) formMsg('err', authErr(error));
+    else formMsg('ok', 'If that account still needs confirming, we sent a new link. Check your inbox and spam folder.');
   },
   retryLoad: () => loadClient(),
   retryBoot: async () => {
@@ -2586,11 +2829,38 @@ const ACTIONS = {
     try { await rpc('delete_my_account'); } catch (e) { busy(el, false); throw e; }
     await signOut('Your account was deleted. Everything you posted is gone.');
   },
+  // Live mode: discovery.
+  followList: (id, which) => showFollowList(id, which),
+  copyProfileLink: async () => {
+    const url = profileLink();
+    try { await navigator.clipboard.writeText(url); toast('Link to your profile copied. Anyone signed in can open it.'); }
+    catch (e) { toast(`Your profile link: ${esc(url)}`, { action: () => {}, label: 'OK' }); }
+  },
+  openNote: async (id, kind) => {
+    const p = postById(id);
+    if (!p || !isMe(p.by)) { toast(esc(ERRORS.not_found)); return; }
+    go('profile');
+    if (kind === 'reply' && !UI.open.has(id)) await ACTIONS.reply(id);
+    const el = $(`#view [data-post="${CSS.escape(id)}"]`); if (!el) return;
+    el.scrollIntoView({ block: 'center', behavior: reduced() ? 'auto' : 'smooth' });
+    el.classList.add('flash');
+    const t = kind === 'reply' ? $(`#reply-${CSS.escape(id)}`) : $('[data-act="menu"]', el); if (t) t.focus({ preventScroll: true });
+  },
   modRefresh: () => loadReports(),
   modRemove: async (id, on) => {
     await rpc('mod_set_post_removed', { p_post: Number(id), p_removed: on === '1' });
     toast(on === '1' ? 'Post removed. Its author was told.' : 'Post restored.');
     await loadReports(); reloadFeedQuiet();
+  },
+  modRemoveReply: async (id, on) => {
+    await rpc('mod_set_reply_removed', { p_reply: Number(id), p_removed: on === '1' });
+    toast(on === '1' ? 'Reply removed. Its author was told.' : 'Reply restored.');
+    await loadReports();
+  },
+  modResetProfile: async id => {
+    await rpc('mod_reset_profile', { p_user: id });
+    toast('Profile reset: name back to the handle, bio cleared. They were told.');
+    PEOPLE.delete(id); await loadReports();
   },
   modBan: async (id, on) => {
     await rpc('mod_set_banned', { p_user: id, p_banned: on === '1' });
@@ -2613,7 +2883,8 @@ document.addEventListener('click', e => {
     if (fn) {
       e.preventDefault();
       if (el.closest('#menu')) closeMenu(true);
-      run(fn, el.dataset.id, el.dataset.arg, el);
+      if (TOGGLES.has(el.dataset.act)) run(fn, el.dataset.id, el.dataset.arg, el);
+      else runOnce(el.dataset.act + '|' + (el.dataset.id || ''), null, fn, el.dataset.id, el.dataset.arg, el);
     }
     return;
   }
@@ -2652,6 +2923,7 @@ document.addEventListener('input', e => {
   else if (t.id === 'pf-bio') $('#bioCount').textContent = t.value.length + '/160';
   else if (t.id === 'reportDetails') $('#reportCount').textContent = t.value.length + '/500';
   else if (LIVE && (t.id === 'su-handle' || t.id === 'pf-handle')) checkHandle(t);
+  else if (t.id === 'peopleQ') { clearTimeout(peopleTimer); const q = t.value.trim(); peopleTimer = setTimeout(() => searchPeople(q), 300); }
   else if (t.dataset.dial) {
     S.dial[t.dataset.dial] = +t.value; S.stats.tuned++;
     $(`#out-${t.dataset.dial}`).textContent = t.value + '%';
@@ -2672,7 +2944,7 @@ document.addEventListener('input', e => {
 document.addEventListener('submit', e => {
   const f = e.target, kind = f.dataset.form; if (!kind) return;
   e.preventDefault();
-  run(submitForm, f, kind);
+  runOnce('form|' + kind + '|' + (f.dataset.id || ''), f.querySelector('button:not([type])'), submitForm, f, kind);
 });
 async function submitForm(f, kind) {
   const text = (f.elements.t ? f.elements.t.value : '').trim();
@@ -2726,12 +2998,13 @@ async function submitForm(f, kind) {
     f.reset();
     toast('Duel created. It is live now.');
     loadDuels().then(() => { renderTicker(); renderLive(); }, e => console.warn(e));
+  } else if (kind === 'people') {
+    clearTimeout(peopleTimer);
+    await searchPeople(f.elements.q.value.trim());
   } else if (['signin', 'signup', 'recover', 'finish'].includes(kind)) {
-    const btn = f.querySelector('button:not([type])');
-    busy(btn, true); formMsg();
+    formMsg(); showResend(false); // The submit button is busy while this runs (runOnce).
     try { await authForm(f, kind); }
     catch (e) { console.warn(e); formMsg('err', authErr(e)); }
-    finally { if (btn.isConnected) busy(btn, false); }
   }
 }
 
@@ -2865,6 +3138,7 @@ function demoStart() {
 let RECOVERY = LIVE && /type=recovery/.test(location.hash + location.search);
 const LINK_ERROR = LIVE && /error_description=|error_code=/.test(location.hash + location.search);
 let SESSION = null, clientScript = null, liveTimer = null, lastPoll = 0, AUTH_NOTE = '', handleTimer = null;
+let WANT_HANDLE = ''; // The handle asked for at sign-up. If it was taken meanwhile, the app says which one you got.
 const HANDLE_HELP = 'Handles are 3 to 20 characters: lowercase letters, numbers, dots and underscores.';
 const logoHTML = '<h1 class="logo">Ben<mark>Social</mark></h1>';
 
@@ -2885,12 +3159,18 @@ function formMsg(kind, text) {
   const m = $('#gate .form-msg'); if (!m) return;
   m.hidden = !text; m.className = 'form-msg' + (kind ? ' ' + kind : ''); m.textContent = text || '';
 }
+// "Send the confirmation email again" shows after sign-up, after an unconfirmed sign-in and on an expired link.
+function showResend(on) { const b = $('#gate [data-act="resend"]'); if (b) b.hidden = !on; }
 function busy(el, on) { if (!el) return; el.disabled = on; if (on) el.setAttribute('aria-busy', 'true'); else el.removeAttribute('aria-busy'); }
+const DUPLICATE_EMAIL = 'An account already uses that email. Sign in, or choose Forgot password.';
 function authErr(e) {
   const code = String((e && e.code) || ''), msg = String((e && e.message) || ''), status = e && e.status;
   if (code === 'invalid_credentials' || /invalid login credentials/i.test(msg)) return "That email and password don't match. Try again.";
-  if (code === 'email_not_confirmed' || /email not confirmed/i.test(msg)) return 'Confirm your email first. Check your inbox for the link we sent.';
-  if (code === 'user_already_exists' || code === 'email_exists' || /already (been )?registered|already exists/i.test(msg)) return 'An account already uses that email. Try signing in.';
+  if (code === 'email_not_confirmed' || /email not confirmed/i.test(msg)) return 'Confirm your email first. Check your inbox and spam folder for the link, or send a new one.';
+  if (code === 'user_already_exists' || code === 'email_exists' || /already (been )?registered|already exists/i.test(msg)) return DUPLICATE_EMAIL;
+  // Supabase's built-in email sender only writes to the project's own team until the owner connects their own (GO-LIVE step 3).
+  if (code === 'email_address_not_authorized' || /not authorized/i.test(msg) && /email/i.test(msg)) return "We can't send email to that address yet. Sign-ups are still being set up. Try again later.";
+  if (/error sending .*email|sending (confirmation|recovery|magic link) email/i.test(msg)) return "We couldn't send the email just now. Try again in a few minutes.";
   if (code === 'same_password') return "That's your current password. Pick a new one.";
   if (code === 'weak_password' || /password should|weak password/i.test(msg)) return 'Pick a stronger password with at least 8 characters.';
   if (code === 'email_address_invalid' || /(invalid|unable to validate) email/i.test(msg)) return "That email address doesn't look right.";
@@ -2905,6 +3185,7 @@ function authHTML(tab) {
       <label>Password<input class="field" id="auth-password" name="password" type="password" autocomplete="current-password" required></label>
       <p class="form-msg" role="alert" hidden></p>
       <button class="btn block">Sign in</button>
+      <button type="button" class="link" data-act="resend" hidden>Send the confirmation email again</button>
       <button type="button" class="link" data-act="forgot">Forgot password?</button>
     </form>`;
   const signup = `<form class="stack" data-form="signup" novalidate>
@@ -2916,7 +3197,7 @@ function authHTML(tab) {
       <label>Password<input class="field" id="su-password" name="password" type="password" minlength="8" autocomplete="new-password" aria-describedby="su-password-hint" required></label>
       <p class="hint" id="su-password-hint">At least 8 characters.</p>
       <label class="check"><input type="checkbox" id="su-age" name="age" required><span>I'm 13 or older</span></label>
-      <label class="check"><input type="checkbox" id="su-terms" name="terms" required><span>I agree to the <button type="button" class="link" data-act="guidelines">Community Guidelines</button></span></label>
+      <label class="check"><input type="checkbox" id="su-terms" name="terms" required><span>${consentHTML()}</span></label>
       <p class="form-msg" role="alert" hidden></p>
       <button class="btn block">Create account</button>
     </form>`;
@@ -2926,11 +3207,12 @@ function authHTML(tab) {
     <div id="authPanel" role="tabpanel" aria-labelledby="tab-${tab}">${tab === 'signup' ? signup : signin}</div>
   </section>`;
 }
-function showAuth(msg = '', tab = UI.authTab, kind = 'err', email = '', tabFocus = false) {
+function showAuth(msg = '', tab = UI.authTab, kind = 'err', email = '', tabFocus = false, resend = false) {
   phase = 'auth'; UI.authTab = tab === 'signup' ? 'signup' : 'signin';
   showGate(authHTML(UI.authTab));
   const em = $('#gate input[type="email"]'); if (em && email) em.value = email;
   if (msg) formMsg(kind, msg);
+  showResend(resend);
   const target = tabFocus ? $('#tab-' + UI.authTab) : email && $('#auth-password') ? $('#auth-password') : $('#gate input');
   if (target) target.focus();
 }
@@ -2965,7 +3247,7 @@ async function authForm(f, kind) {
     if (!email) return bad(el.email, 'Enter your email.');
     if (!password) return bad(el.password, 'Enter your password.');
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) return bad(el.password, authErr(error));
+    if (error) { showResend(error.code === 'email_not_confirmed' || /email not confirmed/i.test(error.message || '')); return bad(el.password, authErr(error)); }
     if (data && data.session) bootLive(data.session);
   } else if (kind === 'signup') {
     const name = el.name.value.trim(), handle = el.handle.value.trim().replace(/^@/, '').toLowerCase(), email = el.email.value.trim(), password = el.password.value;
@@ -2974,14 +3256,21 @@ async function authForm(f, kind) {
     if (!/^\S+@\S+\.\S+$/.test(email)) return bad(el.email, "That email address doesn't look right.");
     if (password.length < 8) return bad(el.password, 'Use at least 8 characters for your password.');
     if (!el.age.checked) return bad(el.age, 'You need to be 13 or older to join BenSocial.');
-    if (!el.terms.checked) return bad(el.terms, 'Agree to the Community Guidelines to create an account.');
+    if (!el.terms.checked) return bad(el.terms, `Agree to the ${LEGAL_LINKS.terms ? 'Terms and the ' : ''}Community Guidelines to create an account.`);
     let free = UI.handleCheck && UI.handleCheck.v === handle ? UI.handleCheck.ok : null;
-    if (free == null) free = await rpc('handle_available', { p_handle: handle }).catch(() => true); // If the check fails, sign-up still picks a free handle.
+    // If the check fails, sign-up goes ahead: a taken handle becomes user1234abcd, and the app says so once you're in.
+    if (free == null) free = await rpc('handle_available', { p_handle: handle }).catch(() => true);
     if (!free) return bad(el.handle, 'That handle is taken. Try another.');
     const { data, error } = await sb.auth.signUp({ email, password, options: { data: { handle, name }, emailRedirectTo: location.origin + location.pathname } });
     if (error) return formMsg('err', authErr(error));
-    if (data && data.session) { bootLive(data.session); return; }
-    showAuth('Check your email to confirm your account, then sign in.', 'signin', 'ok', email);
+    if (data && data.session) { WANT_HANDLE = handle; bootLive(data.session); return; }
+    // With "Confirm email" on, Supabase answers a sign-up for an email that already has an account with a stand-in
+    // user that has no identities, and sends no email. Say so instead of promising an email that never comes.
+    if (data && data.user && Array.isArray(data.user.identities) && !data.user.identities.length) {
+      showAuth(DUPLICATE_EMAIL, 'signin', 'err', email);
+      return;
+    }
+    showAuth('Check your email to confirm your account, then sign in. Nothing there? Check your spam folder, or send it again.', 'signin', 'ok', email, false, true);
   } else if (kind === 'recover') {
     const password = el.password.value;
     if (password.length < 8) return bad(el.password, 'Use at least 8 characters.');
@@ -3020,28 +3309,50 @@ function checkHandle(input) {
   }, 400);
 }
 
-// supabase-js loads only in live mode, and only from SUPABASE_SRC.
+// supabase-js loads only in live mode, and only from SUPABASE_SRC. If jsDelivr is blocked or down, the same
+// file (same hash) comes from unpkg instead.
 function loadClient() {
   phase = 'load';
   showGate(statusHTML('Loading BenSocial…'));
   if (window.supabase && typeof window.supabase.createClient === 'function') { initClient(); return; }
-  if (clientScript) clientScript.remove();
-  const s = clientScript = document.createElement('script');
-  s.src = SUPABASE_SRC; s.async = true;
-  if (SUPABASE_SRC === SUPABASE_CDN) { s.integrity = SUPABASE_SRI; s.crossOrigin = 'anonymous'; }
-  let settled = false;
-  const done = ok => {
-    if (settled) return; settled = true; clearTimeout(timer);
-    if (ok && window.supabase && typeof window.supabase.createClient === 'function') initClient(); else loadFailed();
+  const sources = SUPABASE_SRC === SUPABASE_CDN ? [SUPABASE_CDN, SUPABASE_CDN_2] : [SUPABASE_SRC];
+  const attempt = i => {
+    if (clientScript) clientScript.remove();
+    const s = clientScript = document.createElement('script');
+    s.src = sources[i]; s.async = true;
+    if (s.src === SUPABASE_CDN || s.src === SUPABASE_CDN_2) { s.integrity = SUPABASE_SRI; s.crossOrigin = 'anonymous'; }
+    let settled = false;
+    const done = ok => {
+      if (settled) return; settled = true; clearTimeout(timer);
+      if (ok && window.supabase && typeof window.supabase.createClient === 'function') initClient();
+      else if (i + 1 < sources.length) attempt(i + 1);
+      else loadFailed();
+    };
+    const timer = setTimeout(() => done(false), 15000);
+    s.onload = () => done(true);
+    s.onerror = () => done(false);
+    document.head.append(s);
   };
-  const timer = setTimeout(() => done(false), 20000);
-  s.onload = () => done(true);
-  s.onerror = () => done(false);
-  document.head.append(s);
+  attempt(0);
 }
 function loadFailed() {
   phase = 'error';
-  showGate(statusHTML("BenSocial couldn't load", 'Check your internet connection and try again.', '<button class="btn sm" data-act="retryLoad">Retry</button>'), '[data-act="retryLoad"]');
+  showGate(statusHTML("BenSocial couldn't load", "Part of the app didn't arrive. This can be your connection, or a network or blocker that stops it. Try again, or try another network.", '<button class="btn sm" data-act="retryLoad">Retry</button>'), '[data-act="retryLoad"]');
+}
+// Setup mistakes in BACKEND, caught before anything loads. Visitors see that the site isn't set up; the owner sees what to fix.
+function backendProblem() {
+  let u;
+  try { u = new URL(String(BACKEND.supabaseUrl).trim()); } catch (e) { return 'supabaseUrl in index.html is not a web address. Copy the Project URL from Supabase, for example https://abcd1234.supabase.co'; }
+  if (u.protocol !== 'https:' && !(u.protocol === 'http:' && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(u.hostname))) return 'supabaseUrl in index.html must start with https://';
+  if (u.pathname.replace(/\/+$/, '') || u.search || u.hash) return `supabaseUrl in index.html should be only the project address, ${u.origin}, with nothing after it.`;
+  const key = String(BACKEND.supabaseKey).trim();
+  if (/^sb_secret_/i.test(key)) return 'supabaseKey in index.html is a secret key. Never put it in the app: anyone can read it there. Use the publishable key (sb_publishable_…), and create a new secret key in Supabase.';
+  const part = key.split('.')[1];
+  if (key.split('.').length === 3 && part) {
+    try { if (JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/'))).role === 'service_role') return 'supabaseKey in index.html is the service_role key. Never put it in the app: anyone can read it there. Use the publishable (or anon) key, and change the service_role key in Supabase.'; }
+    catch (e) { /* not a JWT we can read; the server decides */ }
+  }
+  return '';
 }
 async function initClient() {
   try {
@@ -3056,7 +3367,7 @@ async function initClient() {
   try { const { data } = await sb.auth.getSession(); session = data && data.session; } catch (e) { console.warn(e); }
   if (RECOVERY && session) showRecovery();
   else if (session) bootLive(session);
-  else if (phase === 'load') showAuth(LINK_ERROR ? 'That link expired or was already used. Request a new one.' : '');
+  else if (phase === 'load') showAuth(LINK_ERROR ? 'That link expired or was already used. Enter your email to get a new one: send the confirmation email again, or choose Forgot password.' : '', 'signin', 'err', '', false, LINK_ERROR);
 }
 function onAuth(event, session) {
   if (event === 'PASSWORD_RECOVERY') { if (phase !== 'recovery') showRecovery(); return; }
@@ -3091,7 +3402,7 @@ async function loadEverything() {
   const streak = rpc('touch_streak', { p_today: dayKey() }).catch(e => { console.warn('touch_streak failed', e); return null; });
   const [st, prof, follows, mutes, blocks, , positions, , unreadN, stats, ads, views] = await Promise.all([
     streak,
-    streak.then(() => call(sb.from('profiles').select('*').eq('id', MY_ID).maybeSingle())),
+    streak.then(() => rpc('my_profile')), // Other people's profiles show only public columns; your own comes from here.
     call(sb.from('follows').select('followee').eq('follower', MY_ID)),
     call(sb.from('mutes').select('muted_id').eq('user_id', MY_ID)),
     call(sb.from('blocks').select('blocked').eq('blocker', MY_ID)),
@@ -3128,12 +3439,16 @@ function enterApp() {
   hideGate();
   UI.quiet = true; checkBadges(); UI.quiet = false; // Badges you already have don't pop up again.
   const start = route((location.hash || '').slice(1));
-  if (start) { if (start.id) UI.person = start.id; S.view = start.v; }
+  if (start && start.handle) S.view = 'feed'; // Opens once the handle is looked up, below.
+  else if (start) { if (start.id) UI.person = start.id; S.view = start.v; }
   if (!canView(S.view)) S.view = 'feed';
   if (S.view === 'activity') UI.notesLoading = true;
   try { history.replaceState(null, '', '#' + hashFor(S.view)); } catch (e) { /* sandboxed */ }
-  buildShell(); render(); renderTicker(); renderChrome(); save();
+  buildShell(); render(true); renderTicker(); renderChrome(); save(); // Focus moves into the app, off the sign-in form that just went away.
+  if (WANT_HANDLE && S.me.handle && S.me.handle !== WANT_HANDLE) toast(`@${esc(WANT_HANDLE)} was taken, so your handle is @${esc(S.me.handle)}. You can change it in Profile.`);
+  WANT_HANDLE = '';
   if (S.view !== 'duels') enterView(S.view);
+  if (start && start.handle) openHandle(start.handle);
   clearInterval(liveTimer); liveTimer = setInterval(liveTick, POLL_MS); lastPoll = Date.now();
 }
 function leaveApp() {
@@ -3144,7 +3459,8 @@ function leaveApp() {
   PEOPLE.clear(); POSTS.clear(); MY_ID = ''; EMAIL = ''; UNREAD = 0; SESSION = null;
   S = blankLive();
   Object.assign(UI, { why: new Set(), open: new Set(), pop: null, editing: null, mood: null, incoming: [], seenAds: new Set(), adZero: new Set(), rank: new Map(),
-    editProfile: false, confirm: null, person: null, from: null, reportDraft: null, personState: null, personPosts: null, mod: null, handleCheck: null, confirmAccount: false });
+    editProfile: false, confirm: null, person: null, from: null, reportDraft: null, personState: null, personPosts: null, mod: null, handleCheck: null, confirmAccount: false, people: null });
+  WANT_HANDLE = ''; clearTimeout(peopleTimer);
   for (const sel of ['#rail', '#topbar', '#tabbar', '#view', '#live', '#ticker']) $(sel).innerHTML = '';
 }
 async function signOut(note) {
@@ -3190,6 +3506,8 @@ async function poll() {
 function liveStart() {
   if (S.theme) document.documentElement.dataset.theme = S.theme;
   $('.modal-x').innerHTML = ic('x');
+  const problem = backendProblem();
+  if (problem) { phase = 'error'; showGate(statusHTML("BenSocial isn't set up correctly", esc(problem))); console.error('BenSocial setup: ' + problem); return; }
   document.addEventListener('visibilitychange', () => {
     if (phase === 'app' && document.visibilityState === 'visible' && Date.now() - lastPoll >= POLL_MS) { patch(); poll(); }
   });
@@ -3199,7 +3517,8 @@ function liveStart() {
 addEventListener('hashchange', () => {
   if (phase !== 'app') return;
   const r = route(location.hash.slice(1)); if (!r) return;
-  if (r.v === 'person') { if (r.id !== UI.person || S.view !== 'person') openPerson(r.id); }
+  if (r.handle) openHandle(r.handle);
+  else if (r.v === 'person') { if (r.id !== UI.person || S.view !== 'person') openPerson(r.id); }
   else if (r.v !== S.view || !canView(r.v)) go(r.v);
 });
 matchMedia('(max-width:1180px)').addEventListener('change', renderLive);

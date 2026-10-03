@@ -20,6 +20,14 @@ grant usage on schema tst to public;
 create table tst.users (handle text primary key, id uuid not null unique);
 grant select on tst.users to public;
 
+-- Every column of every profile and report, whatever role is active. Members
+-- can only read the public columns of public.profiles (and not the server's
+-- copy in public.reports), so checks on XP, clout, streaks, earnings or report
+-- snapshots read these views. The views run with their owner's rights.
+create view tst.profiles as select * from public.profiles;
+create view tst.reports as select * from public.reports;
+grant select on tst.profiles, tst.reports to public;
+
 create function tst.uid(p_handle text) returns uuid
 language sql stable as $$ select id from tst.users where handle = p_handle $$;
 

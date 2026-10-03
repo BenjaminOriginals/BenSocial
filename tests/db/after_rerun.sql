@@ -8,6 +8,10 @@ select tst.eq((select count(*)::int from public.ads where active), 0, 'ads are s
 select tst.eq((select count(*)::int from pg_trigger where tgrelid = 'auth.users'::regclass and not tgisinternal), 1,
               'the sign-up trigger exists exactly once');
 select tst.eq((select count(*)::int from pg_policies where schemaname = 'public'), 38, 'policies were replaced, not duplicated');
+select tst.ok((select ads_enabled and payments_enabled from public.settings), 'the server switches keep the owner''s choice');
+select tst.eq((select count(*)::int from public.settings), 1, 'settings still has one row');
+select tst.eq((select count(*)::int from public.bans where handle = 'gone_banned' and user_id is null), 1, 'bans of deleted accounts survive');
+select tst.eq(public.handle_available('gone_banned'), false, 'and still hold the handle');
 
 begin;
 do $$

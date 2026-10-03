@@ -7,7 +7,7 @@ declare
   v_xp int;
 begin
   perform tst.login('alice');
-  v_xp := (select xp from public.profiles where id = auth.uid());
+  v_xp := (select xp from tst.profiles where id = auth.uid());
 
   insert into public.posts (body, mood) values ('A spicy take', 'spicy') returning * into p;
   perform tst.eq(p.author_id, tst.uid('alice'), 'author_id defaults to the caller');
@@ -16,7 +16,7 @@ begin
   perform tst.eq(p.price, 5.0000::numeric, 'new post price is 5');
   perform tst.eq(p.price_history, array[5.0000]::numeric[], 'new post price history is {5}');
   perform tst.eq(p.likes + p.dislikes + p.replies + p.reposts, 0, 'counters start at zero');
-  perform tst.eq((select xp from public.profiles where id = auth.uid()), v_xp + 25, 'posting gives 25 XP');
+  perform tst.eq((select xp from tst.profiles where id = auth.uid()), v_xp + 25, 'posting gives 25 XP');
 
   insert into public.posts (body, mood) values ('So wholesome', 'wholesome') returning * into p;
   perform tst.eq(p.spicy, 0.05::real, 'wholesome mood sets spicy .05');
@@ -176,5 +176,94 @@ begin
   perform tst.login('bob');
   perform tst.eq(tst.count(format('select * from public.post_edits where post_id = %s', v)), 0::bigint,
                  'receipt hidden when blocked');
+end $$;
+rollback;
+
+-- Deleting does not reset the rate limits: post and delete five times, and
+-- the sixth post in that minute is still slow_down (and earns no more XP).
+begin;
+do $$
+declare
+  v bigint;
+  v_xp int := (select xp from tst.profiles where id = tst.uid('carol'));
+begin
+  perform tst.login('carol');
+  for i in 1..5 loop
+    insert into public.posts (body) values ('churn ' || i) returning id into v;
+    delete from public.posts where id = v;
+  end loop;
+  perform tst.eq(tst.count(format('select id from public.posts where author_id = %L', tst.uid('carol'))), 0::bigint,
+                 'setup: every churned post is deleted');
+  perform tst.throws($q$insert into public.posts (body) values ('sixth')$q$, 'slow_down',
+                     'posting and deleting still counts toward 5 a minute');
+  perform tst.eq((select xp from tst.profiles where id = auth.uid()), v_xp + 125, 'XP stops at the limit too');
+end $$;
+rollback;
+
+begin;
+insert into public.write_log (user_id, kind, created_at)
+select tst.uid('carol'), 'post', now() - interval '2 hours' from generate_series(1, 100);
+select tst.login('carol');
+select tst.throws($q$insert into public.posts (body) values ('101 counting deleted ones')$q$, 'slow_down',
+                  'deleted posts count toward 100 a day');
+rollback;
+
+begin;
+insert into public.write_log (user_id, kind, created_at)
+select tst.uid('carol'), 'post', now() - interval '25 hours' from generate_series(1, 100);
+select tst.login('carol');
+select tst.lives($q$insert into public.posts (body) values ('a new day')$q$, 'writes older than a day do not count');
+select tst.logout();
+select tst.eq((select count(*)::int from public.write_log where user_id = tst.uid('carol') and kind = 'post'), 1,
+              'old entries are cleared as new ones arrive');
+rollback;
+
+-- Edits: 10 a minute and 100 a day per person, and 50 per post.
+begin;
+do $$
+declare
+  v bigint;
+begin
+  v := tst.post('alice', 'version 0');
+  perform tst.login('alice');
+  for i in 1..10 loop
+    update public.posts set body = 'version ' || i where id = v;
+  end loop;
+  perform tst.throws(format('update public.posts set body = %L where id = %s', 'version 11', v), 'slow_down',
+                     'an 11th edit in a minute is slow_down');
+  perform tst.eq((select count(*)::int from public.post_edits where post_id = v), 10, 'ten versions were kept');
+  perform tst.login('bob');
+  perform tst.lives(format('insert into public.reactions (post_id, kind) values (%s, %L)', v, 'like'),
+                    'other people can still react to the post');
+  perform tst.login('alice');
+  perform tst.lives(format('update public.posts set body = body where id = %s', v), 'saving the same text is not an edit');
+end $$;
+rollback;
+
+begin;
+insert into public.write_log (user_id, kind, created_at)
+select tst.uid('alice'), 'edit', now() - interval '2 hours' from generate_series(1, 100);
+do $$
+declare
+  v bigint := tst.post('alice', 'busy day');
+begin
+  perform tst.login('alice');
+  perform tst.throws(format('update public.posts set body = %L where id = %s', 'edit 101', v), 'slow_down', 'edit 101 of the day is slow_down');
+end $$;
+rollback;
+
+begin;
+do $$
+declare
+  v bigint := tst.post('alice', 'edited a lot');
+begin
+  insert into public.post_edits (post_id, body, written_at)
+  select v, 'old ' || g, now() - make_interval(hours => g) from generate_series(1, 50) g;
+  perform tst.login('alice');
+  perform tst.throws(format('update public.posts set body = %L where id = %s', 'one more', v), 'edit_limit',
+                     'a post with 50 earlier versions cannot be edited again');
+  perform tst.logout();
+  perform tst.lives(format('update public.posts set body = %L where id = %s', 'owner fix', v),
+                    'the SQL editor is not limited');
 end $$;
 rollback;

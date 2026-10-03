@@ -76,7 +76,7 @@ declare
 begin
   v := tst.post('alice', 'round trip');
   perform tst.login('bob');
-  v_xp := (select xp from public.profiles where id = auth.uid());
+  v_xp := (select xp from tst.profiles where id = auth.uid());
   r := public.back_post(v, 100);
   -- delta = (-(a+b*s) + sqrt((a+b*s)^2 + 2*b*M)) / b with s = 0
   expect_shares := (-(a) + sqrt(a * a + 2 * 0.05 * 100)) / 0.05;
@@ -87,7 +87,7 @@ begin
   perform tst.eq((select shares_outstanding from public.posts where id = v), (r->>'shares')::numeric, 'shares_outstanding grows');
   perform tst.eq((select price from public.posts where id = v), (r->>'price')::numeric, 'post price updated');
   perform tst.eq((select cost from public.positions where post_id = v), 100.00::numeric, 'position cost recorded');
-  perform tst.eq((select xp from public.profiles where id = auth.uid()), v_xp + 10, 'backing earns 10 XP');
+  perform tst.eq((select xp from tst.profiles where id = auth.uid()), v_xp + 10, 'backing earns 10 XP');
   perform tst.eq((select backs from json_to_record(public.my_stats()) as t(backs int)), 1, 'my_stats counts backs');
 
   s := public.sell_position(v);
@@ -101,7 +101,7 @@ begin
   perform tst.throws(format('select public.sell_position(%s)', v), 'not_found', 'selling twice is not_found');
 
   r := public.back_post(v, 50);
-  perform tst.eq((select xp from public.profiles where id = auth.uid()), v_xp + 10, 'backing the same post again gives no more XP');
+  perform tst.eq((select xp from tst.profiles where id = auth.uid()), v_xp + 10, 'backing the same post again gives no more XP');
 
   perform tst.login('alice');
   select * into nt from public.notifications where kind = 'back' and post_id = v order by id limit 1;
@@ -119,12 +119,12 @@ declare
 begin
   v := tst.post('alice', 'farm attempt');
   perform tst.login('bob');
-  start := (select clout from public.profiles where id = auth.uid());
+  start := (select clout from tst.profiles where id = auth.uid());
   for i in 1..25 loop
     perform public.back_post(v, 10 + i * 3.37);
     perform public.sell_position(v);
   end loop;
-  perform tst.ok((select clout from public.profiles where id = auth.uid()) <= start, '25 round trips never gain clout');
+  perform tst.ok((select clout from tst.profiles where id = auth.uid()) <= start, '25 round trips never gain clout');
 end $$;
 rollback;
 
@@ -184,11 +184,11 @@ begin
   perform public.back_post(v, 120);
   perform tst.login('carol');
   perform public.back_post(v, 80);
-  perform tst.eq((select clout from public.profiles where id = tst.uid('bob')), 380::numeric, 'setup: bob spent 120');
+  perform tst.eq((select clout from tst.profiles where id = tst.uid('bob')), 380::numeric, 'setup: bob spent 120');
   perform tst.login('alice');
   delete from public.posts where id = v;
-  perform tst.eq((select clout from public.profiles where id = tst.uid('bob')), 500::numeric, 'deleting refunds bob''s cost');
-  perform tst.eq((select clout from public.profiles where id = tst.uid('carol')), 500::numeric, 'deleting refunds carol''s cost');
+  perform tst.eq((select clout from tst.profiles where id = tst.uid('bob')), 500::numeric, 'deleting refunds bob''s cost');
+  perform tst.eq((select clout from tst.profiles where id = tst.uid('carol')), 500::numeric, 'deleting refunds carol''s cost');
   perform tst.logout();
   perform tst.eq((select count(*)::int from public.positions where post_id = v), 0, 'positions removed with the post');
 end $$;
@@ -206,9 +206,98 @@ begin
   perform tst.login('dave');
   perform public.mod_set_post_removed(v, true);
   perform tst.logout();
-  perform tst.eq((select clout from public.profiles where id = tst.uid('bob')), 500::numeric, 'removal refunds the cost');
+  perform tst.eq((select clout from tst.profiles where id = tst.uid('bob')), 500::numeric, 'removal refunds the cost');
   perform tst.eq((select count(*)::int from public.positions where post_id = v), 0, 'removal closes positions');
   perform tst.eq((select shares_outstanding from public.posts where id = v), 0::numeric, 'removal resets shares_outstanding');
   perform tst.eq((select price from public.posts where id = v), 5.0000::numeric, 'removal resets the price to its engagement part');
+end $$;
+rollback;
+
+-- Backing and selling over and over notifies the author once.
+begin;
+do $$
+declare
+  v bigint := tst.post('erin', 'flood target');
+begin
+  perform tst.login('frank');
+  for i in 1..25 loop
+    perform public.back_post(v, 10);
+    perform public.sell_position(v);
+  end loop;
+  perform tst.logout();
+  perform tst.eq((select count(*)::int from public.notifications where user_id = tst.uid('erin') and kind = 'back'), 1,
+                 '25 back-and-sell rounds send one back notification');
+end $$;
+rollback;
+
+-- The pot: what backers paid in minus what sellers took out.
+begin;
+do $$
+declare
+  v bigint := tst.post('alice', 'pot');
+  s json;
+begin
+  perform tst.login('bob');
+  perform public.back_post(v, 120);
+  perform tst.eq((select reserve from public.posts where id = v), 120.00::numeric, 'backing adds to the pot');
+  perform tst.login('carol');
+  perform public.back_post(v, 80);
+  perform tst.eq((select reserve from public.posts where id = v), 200.00::numeric, 'every back adds to the pot');
+  perform tst.login('bob');
+  s := public.sell_position(v);
+  perform tst.eq((select reserve from public.posts where id = v), 200 - (s->>'proceeds')::numeric, 'selling takes out of the pot');
+  perform tst.throws(format('update public.posts set reserve = 1e9 where id = %s', v), '42501', 'clients cannot touch the pot');
+end $$;
+rollback;
+
+-- No clout from nothing: an early backer sells at a profit paid by a later
+-- backer, then the author deletes the post. The later backer is refunded from
+-- what is left, not their full cost, so the three together end where they began.
+begin;
+do $$
+declare
+  v bigint := tst.post('alice', 'mint attempt');
+  start numeric := (select sum(clout) from tst.profiles where id in (tst.uid('alice'), tst.uid('bob'), tst.uid('carol')));
+  sb json;
+  pot numeric;
+begin
+  perform tst.login('bob');
+  perform public.back_post(v, 490);
+  perform tst.login('carol');
+  perform public.back_post(v, 490);
+  perform tst.login('bob');
+  sb := public.sell_position(v);
+  perform tst.ok((sb->>'profit')::numeric > 100, 'setup: the early backer sold at a profit');
+  pot := (select reserve from public.posts where id = v);
+  perform tst.login('alice');
+  delete from public.posts where id = v;
+  perform tst.logout();
+  perform tst.near((select clout from tst.profiles where id = tst.uid('carol')), 500 - 490 + pot, 0.01,
+                   'the later backer gets back what is left in the pot');
+  perform tst.ok((select sum(clout) from tst.profiles where id in (tst.uid('alice'), tst.uid('bob'), tst.uid('carol'))) <= start,
+                 'deleting the post creates no clout');
+end $$;
+rollback;
+
+-- Engagement still pays holders on deletion up to their cost: the market
+-- would pay at least that if they sold now.
+begin;
+do $$
+declare
+  v bigint := tst.post('alice', 'popular then deleted');
+begin
+  perform tst.login('bob');
+  perform public.back_post(v, 100);
+  perform tst.login('carol');
+  perform public.back_post(v, 100);
+  perform tst.logout();
+  update public.posts set likes = 400 where id = v;
+  perform tst.login('bob');
+  perform public.sell_position(v);
+  perform tst.login('alice');
+  delete from public.posts where id = v;
+  perform tst.logout();
+  perform tst.eq((select clout from tst.profiles where id = tst.uid('carol')), 500::numeric,
+                 'a holder whose position is worth more than its cost gets the cost back');
 end $$;
 rollback;
