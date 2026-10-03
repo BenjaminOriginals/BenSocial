@@ -1,31 +1,49 @@
 # BenSocial
 
-**The social network with nothing to hide.** BenSocial for BenOS HTML is a single-file social app (`index.html`). Open it in any browser. There's no build step and no server.
+**The social network with nothing to hide.** BenSocial for BenOS HTML is one file, `index.html`, with no build step.
 
-## What big platforms won't ship
+## Two modes, one file
 
-| Feature | What it does |
+| Mode | When | What you get |
+| --- | --- | --- |
+| **Demo** | `BACKEND` in `index.html` is empty (the default) | A simulated network that runs entirely in the browser. Good for showing the idea. |
+| **Live** | You paste your Supabase URL and publishable key into `BACKEND` | Real accounts, real posts and real people, stored in your own database. |
+
+To go live, follow **[docs/GO-LIVE.md](docs/GO-LIVE.md)**. It takes about 30 minutes.
+
+## What makes it different
+
+- **Public algorithm.** Every post has "Why this?" with its full score. Under *Your algorithm* you set every ranking weight yourself.
+- **Public dislikes.** Dislike counts show on every post.
+- **Edit receipts.** Editing a post keeps every earlier version on a public receipt.
+- **Clout Market.** Back posts early with clout and sell later. In live mode, prices follow real engagement and demand. Clout is earned only, and it can never be bought or cashed out.
+- **Duels.** Two takes go head to head, and you see the split only after you vote. If your side wins, you get clout.
+- **Streaks, XP, levels, badges and a daily drop.** In live mode the server keeps score, so nobody can fake it in the browser.
+
+## Safety
+
+Each person has a profile page. The ⋯ menu on any post or person lets you report, mute or block. Settings has the Community Guidelines, your blocked accounts and account deletion. Admins get a **Moderation** view for reports, removals, bans and creating duels.
+
+## Monetization is parked
+
+Ads and payments are fully built but switched off. At the very top of the script in `index.html`:
+
+```js
+const SWITCHES = {
+  ads: false,       // Ads in the feed, attention price, ad earnings for users.
+  payments: false,  // Money: wallet top-up, tips, cash-out, BenSocial Pro.
+};
+```
+
+While a switch is `false`, nothing about that feature shows anywhere. Set it to `true` to turn it on. [docs/GO-LIVE.md](docs/GO-LIVE.md#the-monetization-switchboard) explains what each switch does, and what must exist before you flip one in live mode.
+
+## Repository
+
+| Path | What it is |
 | --- | --- |
-| **Public algorithm** | Every post has a "Why this?" panel with its full score breakdown. The *Your algorithm* screen lets you set every ranking weight yourself, with presets like Chill, Chaos and Explore. |
-| **Paid attention** | You set an attention price. Advertisers bid to reach you, and bids under your price never show. You keep 70% of every winning bid. Each ad shows what it paid and why it targeted you. |
-| **Public dislikes** | Dislike counts are visible on every post, and they feed the Spice factor. |
-| **Edit receipts** | Editing a post keeps every earlier version on a public receipt. |
-| **Open books** | The Wallet shows every revenue split: ads 70/30, tips 92/8, Pro, and $0 from selling data. |
-| **One-tap cancel** | Pro cancels in one tap on the same screen. |
-
-## Engagement loops
-
-- **Clout Market**: back posts early with clout and cash out if they climb. Clout is earned only. It can't be bought or cashed out, which keeps it out of gambling rules.
-- **Duels**: two takes go head to head. You only see the split after you vote, and you win clout if your side wins.
-- **Streaks, XP, levels, badges, and a daily drop.**
-- **Live world**: the ticker, new-post pill, activity feed and likes on your own posts all update in real time.
-
-## How BenSocial makes money
-
-1. **Ad marketplace**: 30% of every winning bid.
-2. **Tips**: an 8% fee on creator tips.
-3. **BenSocial Pro**: $7.99/month for double daily drops, saved algorithm presets, and 100% of tips received.
-
-## Demo mode
-
-Every account, post, advertiser and dollar is simulated. State is saved in the browser's `localStorage`. *Profile → Reset demo* starts over.
+| `index.html` | The whole app: demo mode, live mode, the switchboard. |
+| `supabase/schema.sql` | The database: tables, security rules and server functions. Paste it into Supabase once. |
+| `supabase/seed.sql` | Optional starter duels and example ads. The ads are inactive. |
+| `docs/GO-LIVE.md` | The owner's go-live checklist. |
+| `tests/db/` | Database tests on a throwaway local PostgreSQL 16: `bash tests/db/run.sh` |
+| `tests/e2e/` | Live-mode browser tests against a local Supabase stand-in: `bash tests/e2e/run.sh` (see its README). |
