@@ -1,0 +1,1641 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BenSocial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=DM+Mono:wght@400;500&family=Onest:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: three-column app shell (nav rail · feed column · live rail) that collapses to one column with a bottom tab bar on phones. */
+:root{
+  color-scheme: dark;
+  --bg:#141019; --surface:#1C1723; --surface-2:#27212F; --line:#352D41;
+  --fg:#F3EFF8; --muted:#AAA0B9; --faint:#726983;
+  --accent:#FFD23F; --accent-ink:#1E1704; --accent-text:#FFD23F; --accent-soft:rgba(255,210,63,.13);
+  --love:#FF6B8B; --gain:#3DDC97; --loss:#FF6767;
+  --paper:#FBF7EC; --paper-ink:#2A251C; --paper-line:#CFC6B2;
+  --f1:#8AB4FF; --f2:#5FD3C6; --f3:#FF8A4C; --f4:#FF9AD0; --f5:#B9A0FF; --f6:#FFD23F;
+  --shadow:0 18px 44px rgba(0,0,0,.5); --scrim:rgba(8,6,12,.68);
+  --font-display:"Bricolage Grotesque","Onest",system-ui,sans-serif;
+  --font-body:"Onest",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"DM Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --r:16px;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    color-scheme: light;
+    --bg:#F5F2F8; --surface:#FFFFFF; --surface-2:#EEE9F3; --line:#DED6E7;
+    --fg:#1C1623; --muted:#625872; --faint:#978DA6;
+    --accent:#FFD23F; --accent-ink:#1E1704; --accent-text:#8C6500; --accent-soft:rgba(255,196,0,.22);
+    --love:#D92D57; --gain:#0B8F58; --loss:#D33434;
+    --paper:#FFFDF5; --paper-ink:#2A251C; --paper-line:#D9D0BC;
+    --f1:#2F6FE0; --f2:#0F9488; --f3:#E0601E; --f4:#D23D95; --f5:#7552E0; --f6:#C99A00;
+    --shadow:0 16px 36px rgba(48,24,72,.14); --scrim:rgba(30,20,40,.45);
+  }
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --bg:#F5F2F8; --surface:#FFFFFF; --surface-2:#EEE9F3; --line:#DED6E7;
+  --fg:#1C1623; --muted:#625872; --faint:#978DA6;
+  --accent:#FFD23F; --accent-ink:#1E1704; --accent-text:#8C6500; --accent-soft:rgba(255,196,0,.22);
+  --love:#D92D57; --gain:#0B8F58; --loss:#D33434;
+  --paper:#FFFDF5; --paper-ink:#2A251C; --paper-line:#D9D0BC;
+  --f1:#2F6FE0; --f2:#0F9488; --f3:#E0601E; --f4:#D23D95; --f5:#7552E0; --f6:#C99A00;
+  --shadow:0 16px 36px rgba(48,24,72,.14); --scrim:rgba(30,20,40,.45);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;margin:0}
+p{margin:0}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.eyebrow{font:500 11px/1.2 var(--font-mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.skip{position:absolute;left:-999px;top:8px;z-index:200;background:var(--accent);color:var(--accent-ink);padding:8px 12px;border-radius:8px;font-weight:600}
+.skip:focus{left:16px}
+.i{flex:none;display:block}
+
+/* Ticker */
+.ticker{background:var(--surface);border-bottom:1px solid var(--line);overflow:hidden;white-space:nowrap;font:500 12px/1 var(--font-mono);color:var(--muted)}
+.ticker-track{display:inline-flex;padding-block:9px;animation:tick 70s linear infinite}
+.ticker:hover .ticker-track{animation-play-state:paused}
+.tk{padding-inline:0 30px;display:inline-flex;gap:6px;align-items:center}
+.tk b{color:var(--fg);font-weight:500}
+.tk-live{color:var(--accent-ink);background:var(--accent);padding:3px 6px;border-radius:4px;letter-spacing:.08em}
+@keyframes tick{to{transform:translateX(-50%)}}
+
+/* Shell */
+.shell{display:grid;grid-template-columns:232px minmax(0,620px) 300px;justify-content:center;gap:28px;max-width:1240px;margin:0 auto;padding-inline:16px;align-items:start}
+.rail{position:sticky;top:env(safe-area-inset-top,0px);max-height:100dvh;overflow-y:auto;padding-block:18px 24px;display:flex;flex-direction:column;gap:18px}
+main{min-width:0;padding-block:22px 96px;outline:none}
+.live{position:sticky;top:env(safe-area-inset-top,0px);max-height:100dvh;overflow-y:auto;padding-block:22px 24px;display:flex;flex-direction:column;gap:14px}
+
+.logo{font:800 26px/1 var(--font-display);letter-spacing:-.02em;display:inline-flex;align-items:baseline}
+.logo mark{background:var(--accent);color:var(--accent-ink);padding:0 .14em .04em;margin-left:.04em;border-radius:.12em .32em .18em .4em;transform:rotate(-2deg);display:inline-block}
+.tagline{color:var(--muted);font-size:13px;margin-top:6px}
+
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:999px;font-size:15.5px;color:var(--muted);position:relative}
+.nav-item:hover{background:var(--surface-2);color:var(--fg)}
+.nav-item[aria-current="page"]{color:var(--fg);font-weight:650;background:var(--surface-2)}
+.nav-item[aria-current="page"] .i{color:var(--accent-text)}
+.badge{min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--love);color:#fff;font:600 11px/18px var(--font-mono);text-align:center;margin-left:auto}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 18px;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-weight:650;font-size:15px;line-height:1;transition:transform .12s ease,filter .12s ease}
+.btn:hover{filter:brightness(1.05)}
+.btn:active{transform:scale(.97)}
+.btn.sm{padding:8px 14px;font-size:13.5px}
+.btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.btn.ghost:hover{background:var(--surface-2)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn.block{width:100%}
+.link{color:var(--accent-text);font-weight:600;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);font-size:13px;color:var(--fg);background:var(--surface)}
+.chip:hover{background:var(--surface-2)}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+
+.me-card{border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--surface)}
+.me-row{display:flex;align-items:center;gap:10px;min-width:0}
+.me-row>div{min-width:0}
+.me-name{font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.me-sub{color:var(--muted);font-size:13px}
+.stat-pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat-pair>div{background:var(--surface-2);border-radius:10px;padding:8px 10px}
+.stat-pair b{display:block;font:500 15px/1.2 var(--font-mono);font-variant-numeric:tabular-nums}
+.stat-pair span{font-size:11.5px;color:var(--muted)}
+.xp{height:6px;background:var(--surface-2);border-radius:999px;overflow:hidden}
+.xp>i{display:block;height:100%;width:0;background:var(--accent);border-radius:999px;transition:width .5s ease}
+.rail-foot{display:flex;flex-direction:column;gap:6px;margin-top:auto;font-size:13px}
+.rail-foot button{color:var(--muted);text-align:left;padding:4px 12px;display:flex;align-items:center;gap:8px}
+.rail-foot button:hover{color:var(--fg)}
+
+/* Topbar + tabbar (phones) */
+.topbar{display:none;position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 16px;align-items:center;gap:10px}
+.topbar .logo{font-size:22px}
+.topbar .spacer{flex:1}
+.pill-stat{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;background:var(--surface-2);font:500 13px/1 var(--font-mono)}
+.icon-btn{position:relative;width:38px;height:38px;display:grid;place-items:center;border-radius:50%}
+.icon-btn:hover{background:var(--surface-2)}
+.icon-btn .badge{position:absolute;top:2px;right:0;margin:0}
+.tabbar{display:none;position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));justify-content:space-around}
+.tabbar button{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--muted);padding:4px 6px;border-radius:10px;min-width:56px}
+.tabbar button[aria-current="page"]{color:var(--fg);font-weight:600}
+.tabbar button[aria-current="page"] .i{color:var(--accent-text)}
+
+/* Views */
+.view-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.view-title{font-size:30px;font-weight:750;letter-spacing:-.02em}
+.view-sub,.lede{color:var(--muted);font-size:14.5px;margin-bottom:16px;max-width:60ch}
+.lede{font-size:15.5px}
+.lede b{color:var(--fg)}
+.h2{font-size:19px;font-weight:700;letter-spacing:-.01em}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px;margin-bottom:16px;min-width:0}
+.panel-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.up{color:var(--gain)} .down{color:var(--loss)}
+
+.tabs{display:flex;gap:4px;background:var(--surface-2);padding:4px;border-radius:999px}
+.tab{padding:7px 14px;border-radius:999px;font-size:14px;color:var(--muted);font-weight:500}
+.tab[aria-selected="true"]{background:var(--surface);color:var(--fg);font-weight:650;box-shadow:0 1px 0 var(--line)}
+
+/* Welcome */
+.welcome{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 18px 16px;margin-bottom:16px;overflow:hidden}
+.welcome h2{font-size:22px;font-weight:750;letter-spacing:-.02em;margin-bottom:12px;padding-right:32px}
+.welcome h2 mark{background:var(--accent);color:var(--accent-ink);padding:0 .15em;border-radius:.15em}
+.welcome ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px}
+.welcome li{display:flex;gap:10px;align-items:flex-start;font-size:14px;min-width:0}
+.welcome li .i{color:var(--accent-text);margin-top:2px}
+.welcome li b{display:block}
+.welcome li span{color:var(--muted)}
+.welcome .x{position:absolute;top:12px;right:12px}
+
+/* Composer */
+.composer{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;margin-bottom:16px}
+.composer textarea{width:100%;min-height:64px;resize:vertical;background:transparent;border:0;outline:none;font-size:16.5px;line-height:1.45;padding:10px 0 4px}
+.composer textarea::placeholder{color:var(--faint)}
+.composer-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:10px}
+.composer-row .spacer{flex:1}
+.count{font:500 12px var(--font-mono);color:var(--muted)}
+.hint{font-size:12.5px;color:var(--muted)}
+
+.drop-banner{display:flex;align-items:center;gap:12px;background:var(--accent-soft);border:1px dashed var(--accent);border-radius:var(--r);padding:12px 14px;margin-bottom:16px}
+.drop-banner p{flex:1;font-size:14px;min-width:0}
+
+.new-pill-wrap{display:flex;justify-content:center;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);z-index:5;height:0}
+.new-pill{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:var(--accent-ink);font-weight:650;font-size:14px;padding:8px 16px;border-radius:999px;box-shadow:var(--shadow);transform:translateY(-4px);animation:pop .3s ease}
+@keyframes pop{from{transform:translateY(-14px);opacity:0}}
+
+/* Feed + posts */
+.feed{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.post{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;padding:16px 18px;border-top:1px solid var(--line)}
+.feed>:first-child{border-top:0}
+.av{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:hsl(var(--h) 50% 44%);color:#fff;font:700 15px/1 var(--font-display);flex:none;letter-spacing:.01em}
+.av.sm{width:30px;height:30px;font-size:11.5px}
+.av.lg{width:72px;height:72px;font-size:26px}
+.av.sq{border-radius:10px}
+.post-body{min-width:0}
+.post-head{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.name{font-weight:650}
+.handle{color:var(--muted);font-size:14px}
+.pro-tag{font:600 10px/1 var(--font-mono);letter-spacing:.08em;background:var(--accent);color:var(--accent-ink);padding:3px 5px;border-radius:4px;align-self:center}
+.head-act{margin-left:auto;font-size:13px;font-weight:600;color:var(--accent-text);padding:3px 11px;border:1px solid var(--line);border-radius:999px}
+.head-act.on{color:var(--muted)}
+.head-act:hover{background:var(--surface-2)}
+.post-text{margin-top:4px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15.5px}
+.receipt-link{display:inline-flex;align-items:center;gap:5px;margin-top:6px;font:500 12px/1 var(--font-mono);color:var(--muted);border-bottom:1px dashed var(--faint);padding-bottom:2px}
+.receipt-link:hover{color:var(--fg)}
+.post-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+.clout-chip{display:inline-flex;align-items:center;gap:6px;font:500 12.5px/1 var(--font-mono);padding:6px 10px;border-radius:999px;background:var(--surface-2);font-variant-numeric:tabular-nums}
+.clout-chip:hover{outline:1px solid var(--line)}
+.clout-chip .lbl{color:var(--muted)}
+.tips-line{font-size:12.5px;color:var(--muted)}
+.actions{display:flex;justify-content:space-between;gap:2px;margin-top:8px;max-width:500px;margin-left:-8px}
+.act{display:inline-flex;align-items:center;gap:6px;padding:7px 8px;border-radius:999px;color:var(--muted);font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.act:hover{background:var(--surface-2);color:var(--fg)}
+.act.love.on{color:var(--love)} .act.love.on .i{fill:currentColor}
+.act.hate.on{color:var(--loss)}
+.act.rp.on{color:var(--gain)}
+.act[aria-expanded="true"]{color:var(--accent-text)}
+.act-l{font-family:var(--font-body);font-size:13px}
+
+.pop{margin-top:10px;background:var(--surface-2);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.pop-row{display:flex;gap:8px;flex-wrap:wrap}
+.pop .fine{font-size:12.5px;color:var(--muted)}
+
+.poll{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.poll-opt{text-align:left;padding:10px 14px;border:1px solid var(--line);border-radius:10px;font-weight:550}
+.poll-opt:hover{border-color:var(--accent);background:var(--accent-soft)}
+.poll-row{position:relative;display:flex;justify-content:space-between;gap:10px;padding:10px 14px;border-radius:10px;overflow:hidden;background:var(--surface-2)}
+.poll-row>*{position:relative}
+.poll-fill{position:absolute!important;inset:0 auto 0 0;background:var(--line);transition:width .6s ease}
+.poll-row.mine .poll-fill{background:var(--accent-soft)}
+.poll-row b{font:500 13px var(--font-mono)}
+.poll-meta{font-size:12.5px;color:var(--muted)}
+
+.why{margin-top:12px;border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px;background:var(--bg)}
+.why-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12.5px}
+.why-head .eyebrow{color:var(--accent-text)}
+.why-bar{display:flex;height:10px;border-radius:999px;overflow:hidden;background:var(--surface-2);gap:2px}
+.why-bar span{display:block;min-width:0}
+.tbl-wrap{overflow-x:auto}
+.why-table{width:100%;border-collapse:collapse;font:12.5px/1.3 var(--font-mono);font-variant-numeric:tabular-nums}
+.why-table th{text-align:left;font-weight:500;font-family:var(--font-body);font-size:13px;padding:4px 0;white-space:nowrap}
+.why-table td{text-align:right;padding:4px 0 4px 10px;color:var(--muted);white-space:nowrap}
+.why-table td:last-child{color:var(--fg)}
+.sw{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:8px;vertical-align:0}
+.why-note{font-size:13px;color:var(--muted)}
+.why-actions{display:flex;gap:6px;flex-wrap:wrap}
+
+.thread{margin-top:12px;display:flex;flex-direction:column;gap:12px;border-left:2px solid var(--line);padding-left:12px}
+.reply{display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;font-size:14.5px}
+.reply p{overflow-wrap:anywhere}
+.reply-form,.inline-form{display:flex;gap:8px}
+.reply-form input,.field{flex:1;min-width:0;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:9px 14px;outline:none}
+.reply-form input:focus,.field:focus,.edit-form textarea:focus{border-color:var(--accent)}
+.edit-form{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.edit-form textarea{width:100%;min-height:80px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;resize:vertical;outline:none}
+.row{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+
+/* Ads */
+.ad{padding:16px 18px;border-top:1px solid var(--line);background:var(--surface-2);display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px}
+.ad-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ad-pay{margin-left:auto;font:500 12px/1 var(--font-mono);background:var(--accent);color:var(--accent-ink);padding:5px 9px;border-radius:999px;display:inline-flex;gap:5px;align-items:center}
+.ad-pay.paid{background:transparent;color:var(--gain);border:1px solid var(--gain)}
+.ad-copy{margin-top:4px;font-size:15px}
+.ad-receipt{margin-top:10px;border-top:1px dashed var(--faint);padding-top:8px;font:12px/1.6 var(--font-mono);color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px}
+.ad-receipt b{color:var(--fg);font-weight:500}
+
+.empty{padding:36px 20px;text-align:center;color:var(--muted)}
+
+/* Algorithm */
+.formula{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.7;margin-bottom:14px;overflow-wrap:anywhere}
+.formula .k{color:var(--muted)}
+.formula .term{white-space:nowrap}
+.formula .sw{margin-right:5px}
+.presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.dials{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.dial{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.dial-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.dial label{font-weight:650;display:flex;align-items:center}
+.dial output{font-size:13px;color:var(--muted)}
+.dial input{width:100%;accent-color:var(--c,var(--accent));margin:0}
+.dial-desc{font-size:13px;color:var(--muted)}
+.preview{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;counter-reset:rk}
+.preview li{display:grid;grid-template-columns:28px 30px minmax(0,1fr) auto;gap:10px;align-items:center;counter-increment:rk}
+.preview li::before{content:counter(rk);font:500 13px var(--font-mono);color:var(--muted);text-align:center}
+.preview .snip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+.list-row{display:flex;align-items:center;gap:10px;justify-content:space-between}
+
+/* Market */
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;min-width:0}
+.kpi b{display:block;font:500 22px/1.2 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi span{font-size:12.5px;color:var(--muted)}
+.mrow{display:grid;grid-template-columns:30px minmax(0,1fr) 96px 84px auto;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.mrow:first-of-type{border-top:0}
+.mrow .who{font-size:13px;color:var(--muted)}
+.mrow .snip{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mrow .px{text-align:right;font:500 14px/1.3 var(--font-mono);font-variant-numeric:tabular-nums}
+.mrow .px small{display:block;font-size:12px}
+.spark{display:block;overflow:visible}
+.spark.up{color:var(--gain)} .spark.down{color:var(--loss)}
+.spark-line{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
+.spark-area{fill:currentColor;opacity:.12;stroke:none}
+.spark-dot{fill:currentColor}
+.note-box{font-size:13px;color:var(--muted);background:var(--surface-2);border-radius:10px;padding:10px 12px}
+
+/* Duels */
+.duel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin-bottom:16px;display:flex;flex-direction:column;gap:14px}
+.duel-top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.duel h2{font-size:22px;font-weight:750;letter-spacing:-.015em}
+.sides{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:10px;align-items:stretch}
+.vs{align-self:center;font:800 14px var(--font-display);color:var(--muted)}
+.side{border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--bg);min-width:0}
+.side.mine{border-color:var(--accent);background:var(--accent-soft)}
+.side-who{display:flex;align-items:center;gap:8px;font-size:13.5px;min-width:0}
+.side p{font-size:15px;flex:1}
+.split{display:flex;height:34px;border-radius:10px;overflow:hidden;font:500 13px/34px var(--font-mono);font-variant-numeric:tabular-nums}
+.split>div{padding:0 10px;white-space:nowrap;transition:flex-basis .6s ease;min-width:0;overflow:hidden}
+.split>div{color:var(--fg)}
+.split .a{background:color-mix(in srgb,var(--f1) 38%,var(--surface))}
+.split .b{background:color-mix(in srgb,var(--f3) 38%,var(--surface));text-align:right}
+.locked{display:flex;align-items:center;justify-content:center;gap:8px;height:34px;border-radius:10px;border:1px dashed var(--line);color:var(--muted);font-size:13.5px}
+
+/* Wallet */
+.balance{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.big-num{font:500 44px/1 var(--font-mono);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.price-out{font:500 28px/1 var(--font-mono)}
+#adPrice{width:100%;accent-color:var(--accent);margin:0}
+.scale{display:flex;justify-content:space-between;font:12px var(--font-mono);color:var(--faint)}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{text-align:left;font:500 11px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:6px 8px 8px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:10px 8px 10px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td.num,.tbl th.num{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.tbl tr:last-child td{border-bottom:0}
+.status{display:inline-block;font:500 11.5px/1 var(--font-mono);padding:4px 8px;border-radius:999px}
+.status.ok{color:var(--gain);border:1px solid currentColor}
+.status.no{color:var(--muted);border:1px dashed var(--line)}
+.books{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.book{border:1px solid var(--line);border-radius:12px;padding:12px;min-width:0}
+.book b{display:block;font-size:14px;margin-bottom:6px}
+.book .bar{display:flex;height:8px;border-radius:999px;overflow:hidden;gap:2px;margin-bottom:6px}
+.book .bar i{display:block}
+.book p{font:12.5px/1.4 var(--font-mono);color:var(--muted)}
+.ledger{list-style:none;margin:0;padding:0}
+.ledger li{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--line);font-size:14px}
+.ledger li:first-child{border-top:0}
+.ledger .mono{white-space:nowrap}
+
+/* Activity */
+.notes{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.notes li{display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:12px;align-items:baseline;padding:14px 16px;border-top:1px solid var(--line);font-size:14.5px}
+.notes li:first-child{border-top:0}
+.notes .dot{width:8px;height:8px;border-radius:50%;background:transparent}
+.notes li.unread .dot{background:var(--accent)}
+.notes time{font:12px var(--font-mono);color:var(--muted)}
+
+/* Profile */
+.profile-card{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.profile-card>div{min-width:0;flex:1}
+.profile-name{font-size:26px;font-weight:750;letter-spacing:-.02em;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.stats>div{background:var(--surface-2);border-radius:12px;padding:10px;min-width:0}
+.stats b{display:block;font:500 18px/1.2 var(--font-mono);font-variant-numeric:tabular-nums}
+.stats span{font-size:12px;color:var(--muted)}
+.badges{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.badge-card{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.badge-card .i{color:var(--accent-text)}
+.badge-card b{font-size:13.5px}
+.badge-card span{font-size:12px;color:var(--muted)}
+.badge-card.off{opacity:.5;border-style:dashed}
+.badge-card.off .i{color:var(--muted)}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.form-grid label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}
+.form-grid .field{border-radius:10px}
+
+/* Live rail cards */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px}
+.card-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.streak{display:flex;align-items:center;gap:12px}
+.flame{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent-text)}
+.streak b{font:750 22px/1 var(--font-display)}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.days span{display:flex;flex-direction:column;align-items:center;gap:4px;font:11px var(--font-mono);color:var(--faint)}
+.days i{width:100%;height:6px;border-radius:999px;background:var(--surface-2)}
+.days .on i{background:var(--accent)}
+.days .on{color:var(--muted)}
+.mini{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:center;text-align:left;padding:4px;border-radius:10px}
+.mini:hover{background:var(--surface-2)}
+.mini .snip{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini .who{font-size:12px;color:var(--muted)}
+.mini .mono{font-size:12px}
+.fine{font-size:12px;color:var(--faint)}
+
+/* Modal */
+.modal{position:fixed;inset:0;z-index:80;background:var(--scrim);display:grid;place-items:center;padding:16px;animation:fade .18s ease}
+@keyframes fade{from{opacity:0}}
+.modal-card{position:relative;width:min(460px,100%);max-height:calc(100dvh - 32px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:22px}
+.modal-x{position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;z-index:2;background:var(--surface)}
+.modal-x:hover{background:var(--surface-2)}
+.pro h2{font-size:28px;font-weight:800;letter-spacing:-.02em}
+.pro .price{font:500 15px var(--font-mono);color:var(--muted);margin:6px 0 16px}
+.pro ul{list-style:none;margin:0 0 18px;padding:0;display:flex;flex-direction:column;gap:10px}
+.pro li{display:flex;gap:10px;align-items:flex-start;font-size:15px}
+.pro li .i{color:var(--gain);margin-top:3px}
+
+.receipt{background:var(--paper);color:var(--paper-ink);font:13px/1.55 var(--font-mono);padding:22px 20px 30px;margin:8px auto 0;max-width:340px;position:relative;
+  -webkit-mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50%/14px 100%;mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50%/14px 100%}
+.receipt hr{border:0;border-top:1px dashed var(--paper-line);margin:12px 0}
+.r-title{text-align:center;font-weight:500;letter-spacing:.14em}
+.r-meta,.r-foot{text-align:center;font-size:11.5px;letter-spacing:.06em}
+.r-row{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;letter-spacing:.05em}
+.r-ver p{margin-top:6px;overflow-wrap:anywhere}
+.r-ver.old p{text-decoration:line-through;text-decoration-color:var(--paper-line);opacity:.8}
+
+/* Toasts */
+#toasts{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:90;display:flex;flex-direction:column;gap:8px;align-items:center;width:min(440px,calc(100% - 32px));pointer-events:none}
+.toast{pointer-events:auto;background:var(--fg);color:var(--bg);padding:11px 16px;border-radius:14px;font-size:14px;box-shadow:var(--shadow);display:flex;gap:12px;align-items:center;animation:pop .25s ease;max-width:100%}
+.toast.accent{background:var(--accent);color:var(--accent-ink)}
+.toast.out{opacity:0;transform:translateY(6px);transition:all .3s ease}
+.toast-act{font-weight:700;text-decoration:underline;white-space:nowrap}
+.burst{position:fixed;width:8px;height:8px;border-radius:2px;pointer-events:none;z-index:95;animation:burst .8s cubic-bezier(.2,.7,.3,1) forwards}
+@keyframes burst{to{transform:translate(var(--dx),var(--dy)) rotate(260deg);opacity:0}}
+.flash{animation:flash 1s ease}
+@keyframes flash{0%{background:var(--accent-soft)}}
+
+.only-narrow{display:none}
+
+@media (max-width:1180px){
+  .shell{grid-template-columns:220px minmax(0,620px)}
+  .live{display:none}
+  .only-narrow{display:flex}
+}
+@media (max-width:860px){
+  .shell{grid-template-columns:minmax(0,1fr);gap:0}
+  .rail{display:none}
+  .topbar,.tabbar{display:flex}
+  main{padding-block:16px 110px}
+  .new-pill-wrap{top:calc(env(safe-area-inset-top,0px) + 70px)}
+  #toasts{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+  .stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .badges{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:560px){
+  .view-title{font-size:25px}
+  .post,.ad{grid-template-columns:36px minmax(0,1fr);gap:10px;padding:14px}
+  .post>.av,.ad>.av,.composer>.av{width:36px;height:36px;font-size:13px}
+  .composer{grid-template-columns:36px minmax(0,1fr);padding:12px 14px}
+  .act-l{display:none}
+  .welcome ul,.dials,.books,.form-grid{grid-template-columns:minmax(0,1fr)}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpis .kpi:last-child{grid-column:1/-1}
+  .mrow{grid-template-columns:30px minmax(0,1fr) auto;row-gap:8px}
+  .mrow .spark-cell{display:none}
+  .mrow .btn{grid-column:2/-1;justify-self:start}
+  .sides{grid-template-columns:minmax(0,1fr)}
+  .vs{justify-self:center}
+  .big-num{font-size:36px}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+  .ticker{overflow-x:auto}
+  .ticker-track{animation:none!important}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#view">Skip to content</a>
+<div class="ticker" aria-label="Live activity"><div class="ticker-track" id="ticker"></div></div>
+<header class="topbar" id="topbar"></header>
+<div class="shell">
+  <nav class="rail" id="rail" aria-label="Main"></nav>
+  <main id="view" tabindex="-1"></main>
+  <aside class="live" id="live" aria-label="Live"></aside>
+</div>
+<nav class="tabbar" id="tabbar" aria-label="Main"></nav>
+<div class="modal" id="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-label="Dialog">
+    <button class="modal-x" data-act="close" aria-label="Close"></button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const rand = (a, b) => a + Math.random() * (b - a);
+const randi = (a, b) => Math.floor(rand(a, b + 1));
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const money = c => (c < 0 ? '−$' : '$') + (Math.abs(c) / 100).toFixed(2);
+const cents = c => (Math.round(c * 10) / 10).toFixed(1) + '¢';
+const fmt = n => { n = Math.round(n); if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M'; if (n >= 1e4) return Math.round(n / 1e3) + 'K'; if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K'; return String(n); };
+const pct = c => (c >= 0 ? '▲' : '▼') + Math.abs(c * 100).toFixed(1) + '%';
+const ago = t => { const m = Math.max(0, (Date.now() - t) / 6e4); if (m < 1) return 'now'; if (m < 60) return Math.floor(m) + 'm'; const h = m / 60; if (h < 24) return Math.floor(h) + 'h'; return Math.floor(h / 24) + 'd'; };
+const dayKey = (d = new Date()) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const short = (t, n = 48) => t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t;
+const stamp = t => { const d = new Date(t); return d.toLocaleString('en-US', { month: 'short', day: '2-digit' }).toUpperCase() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const ICONS = {
+  home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  sliders: '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+  trend: '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
+  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  wallet: '<rect x="2" y="5" width="20" height="15" rx="2.5"/><path d="M16 12.5h2"/><path d="M2 9h20"/>',
+  bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+  user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  heart: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
+  down: '<path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>',
+  reply: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z"/>',
+  repost: '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+  dollar: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+  edit: '<path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/>',
+  gift: '<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>',
+  award: '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
+  x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  flame: '<path d="M12 22c4.4 0 7-3 7-6.8 0-3.9-2.7-6-4.1-9.7-.3-.8-1.3-.9-1.7-.2-.8 1.4-1.5 2.9-1.5 4.4-1-.9-1.6-2-1.8-3.3-.1-.7-1-1-1.5-.4C6.2 8.4 5 10.8 5 14.8 5 19 7.6 22 12 22z"/>',
+  receipt: '<path d="M5 2h14v20l-3-2-2 2-2-2-2 2-2-2-3 2z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/>',
+  star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  diamond: '<path d="M12 2.5 21.5 12 12 21.5 2.5 12z"/>',
+  up: '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>',
+  check: '<polyline points="20 6 9 17 4 12"/>',
+  moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+  sun: '<circle cx="12" cy="12" r="4.5"/><path d="M12 1.5v2.5M12 20v2.5M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M1.5 12H4M20 12h2.5M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"/>',
+  lock: '<rect x="4" y="11" width="16" height="11" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+};
+const ic = (n, s = 18) => `<svg class="i" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]}</svg>`;
+
+/* ---------- world ---------- */
+const USERS = {
+  maya:  { name: 'Maya Ortiz',   handle: 'maya.builds', hue: 18 },
+  devon: { name: 'Devon Achebe', handle: 'devon',       hue: 205 },
+  priya: { name: 'Priya Nair',   handle: 'priya.eats',  hue: 330 },
+  kofi:  { name: 'Kofi Mensah',  handle: 'kofi.runs',   hue: 150 },
+  lena:  { name: 'Lena Vogel',   handle: 'lena.draws',  hue: 268 },
+  sam:   { name: 'Sam Rivera',   handle: 'sam_takes',   hue: 2 },
+  jun:   { name: 'Jun Park',     handle: 'jun.codes',   hue: 222 },
+  ana:   { name: 'Ana Lima',     handle: 'ana.plants',  hue: 110 },
+  theo:  { name: 'Theo Grant',   handle: 'theo.money',  hue: 42 },
+  rosa:  { name: 'Rosa Kim',     handle: 'rosa.wild',   hue: 178 },
+};
+
+const SEED_POSTS = [
+  { id: 'p1', by: 'sam', mins: 38, text: 'Hot take: tipping screens at self-checkout should be illegal. I scanned the groceries. I bagged the groceries. Who exactly am I tipping?', likes: 2840, dislikes: 1960, replies: 612, reposts: 341, spicy: .9, wholesome: .05, mom: .03, tips: 1840, tippers: 22,
+    thread: [{ by: 'theo', mins: 30, text: 'The kiosk has a family to feed.' }, { by: 'priya', mins: 25, text: 'I tip the bagging area out of respect.' }] },
+  { id: 'p2', by: 'maya', mins: 95, text: 'Finished the walnut desk. 41 hours, 3 splinters, zero regrets. The live edge came from a tree that fell on my street in March.', likes: 1204, dislikes: 12, replies: 88, reposts: 61, spicy: .03, wholesome: .92, mom: .02, tips: 6420, tippers: 71,
+    edits: [{ mins: 95, text: 'Finished the walnut desk. 40 hours, 3 splinters, zero regrets.' }], editedMins: 80,
+    thread: [{ by: 'lena', mins: 70, text: 'That grain! Can I draw it?' }] },
+  { id: 'p3', by: 'jun', mins: 160, text: 'Every app hides its ranking formula "to protect users." BenSocial prints it under every post. Turns out users can handle multiplication.', likes: 3310, dislikes: 221, replies: 240, reposts: 902, spicy: .35, wholesome: .45, mom: .015, tips: 2210, tippers: 30 },
+  { id: 'p4', by: 'priya', mins: 210, text: "Made dal makhani from my grandmother's handwritten recipe card. Next to butter it just says \"enough.\" I used a lot.", likes: 980, dislikes: 8, replies: 64, reposts: 40, spicy: .02, wholesome: .9, mom: .01, tips: 900, tippers: 12 },
+  { id: 'p5', by: 'theo', mins: 300, text: "Other apps sell your attention to advertisers and keep 100% of the money. Here you set the price and keep 70%. Raise yours. You're underpriced.", likes: 1720, dislikes: 310, replies: 133, reposts: 288, spicy: .5, wholesome: .3, mom: .025,
+    edits: [{ mins: 300, text: 'Other apps sell your attention for about a cent. Here you set the price.' }], editedMins: 290 },
+  { id: 'p6', by: 'devon', mins: 360, text: 'Group chats should auto-delete after 30 days. Nobody needs a 2019 argument about brunch resurfacing.', likes: 1410, dislikes: 990, replies: 410, reposts: 120, spicy: .7, wholesome: .15, mom: .02,
+    poll: [{ l: 'Yes, delete them', v: 2210 }, { l: 'No, I need the receipts', v: 1630 }] },
+  { id: 'p7', by: 'kofi', mins: 420, text: '5:40am. 12 km. Nobody on the bridge except me and a heron. Streak day 214.', likes: 760, dislikes: 4, replies: 39, reposts: 22, spicy: .02, wholesome: .85, mom: .008 },
+  { id: 'p8', by: 'lena', mins: 520, text: 'I drew every regular at my café for a month. 31 portraits. The barista asked me to make his "more mysterious."', likes: 2060, dislikes: 15, replies: 150, reposts: 310, spicy: .03, wholesome: .95, mom: .018, tips: 3800, tippers: 44 },
+  { id: 'p9', by: 'ana', mins: 700, text: 'Repotted the monstera. She is now taller than my landlord. That is not a metaphor.', likes: 640, dislikes: 6, replies: 31, reposts: 18, spicy: .05, wholesome: .8, mom: .006 },
+  { id: 'p10', by: 'rosa', mins: 900, text: 'Saw a black bear at about 40 meters. We looked at each other. I made myself big. He was not impressed. We both left.', likes: 1890, dislikes: 9, replies: 120, reposts: 240, spicy: .05, wholesome: .75, mom: .004 },
+  { id: 'p11', by: 'sam', mins: 1100, text: 'Replies that start with "Actually," should cost 10 cents a word, paid to the person being corrected.', likes: 1330, dislikes: 870, replies: 520, reposts: 95, spicy: .8, wholesome: .1, mom: -.005 },
+  { id: 'p12', by: 'jun', mins: 1300, text: "Shipped a feature at 4:58pm on a Friday. If you don't hear from me, tell my cat I'm sorry.", likes: 2450, dislikes: 30, replies: 180, reposts: 400, spicy: .15, wholesome: .6, mom: -.01 },
+];
+
+const INCOMING = [
+  { by: 'kofi', text: 'Ran past a guy walking a cat on a leash. The cat had better form than me.', spicy: .05, wholesome: .85 },
+  { by: 'sam', text: 'People who crowd the gate before their group is called: you are not boarding faster. You are just standing closer.', spicy: .75, wholesome: .1 },
+  { by: 'lena', text: 'Sketchbook page 112: the same pigeon, four days in a row. I think we are friends now.', spicy: .02, wholesome: .9 },
+  { by: 'theo', text: "Subscriptions you forgot about are the most profitable product on earth. Go check your statement. I'll wait.", spicy: .45, wholesome: .3 },
+  { by: 'priya', text: 'Hot honey on everything, day 9. No regrets. Slight sting.', spicy: .1, wholesome: .7 },
+  { by: 'jun', text: 'The best code I wrote this week was the code I deleted.', spicy: .2, wholesome: .5 },
+  { by: 'rosa', text: 'Trail closed for a nesting owl. Best reason for a detour I have ever seen.', spicy: .02, wholesome: .9 },
+  { by: 'devon', text: 'Voice notes over 60 seconds should come with a transcript and an apology.', spicy: .65, wholesome: .15 },
+  { by: 'ana', text: 'My pothos grew a new leaf. I told the group chat. The group chat did not care. You care, right?', spicy: .02, wholesome: .85 },
+  { by: 'maya', text: 'Reclaimed oak from a 1920s barn. Found a horseshoe nail inside. It is going into the drawer pull.', spicy: .02, wholesome: .85 },
+];
+
+const DUEL_POOL = [
+  { id: 'd1', title: 'Does pineapple belong on pizza?', hours: 5, a: { by: 'priya', take: 'Sweet, salty, sharp. It balances the cheese. Pineapple belongs.', v: 4120 }, b: { by: 'sam', take: 'Fruit on pizza is dessert wearing a dinner costume.', v: 3880 } },
+  { id: 'd2', title: 'Office or remote?', hours: 11, a: { by: 'theo', take: "Careers happen in hallways. You can't bump into someone on a video call.", v: 2210 }, b: { by: 'jun', take: 'My commute is nine steps and my code reviews got better.', v: 3570 } },
+  { id: 'd3', title: 'Is cereal a soup?', hours: 20, a: { by: 'devon', take: 'Solid pieces in a liquid, eaten with a spoon from a bowl. Soup.', v: 1890 }, b: { by: 'ana', take: 'Soup is savory and usually hot. Cereal is breakfast. Done.', v: 2450 } },
+  { id: 'd4', title: 'Should phones be banned at concerts?', hours: 16, a: { by: 'lena', take: 'Watch the show, not your screen. The band can tell.', v: 2900 }, b: { by: 'kofi', take: 'Ten seconds of shaky video is how I remember the best night of my year.', v: 2650 } },
+  { id: 'd5', title: 'Is a hot dog a sandwich?', hours: 14, a: { by: 'maya', take: "Bread, filling, handheld. It's a sandwich and you know it.", v: 2010 }, b: { by: 'rosa', take: 'One piece of bread hinged at the bottom is its own thing.', v: 2120 } },
+];
+
+const ADS = [
+  { id: 'a1', brand: 'Pebble Bank', hue: 205, bid: 15, copy: 'A savings account with no monthly fees and no minimum balance.', why: 'You opened your Wallet this week.' },
+  { id: 'a2', brand: 'Atlas Languages', hue: 280, bid: 12, copy: 'Ten minutes a day. Real conversations by month three.', why: 'You liked posts that mention travel.' },
+  { id: 'a3', brand: 'Paceline Run Club', hue: 140, bid: 9, copy: 'Free Saturday group runs. All paces. Coffee after.', why: 'You follow @kofi.runs.' },
+  { id: 'a4', brand: 'Loom Coffee Roasters', hue: 25, bid: 6, copy: 'Roasted Tuesday, at your door Thursday. Single-origin beans.', why: 'You liked a breakfast post.' },
+  { id: 'a5', brand: 'Fieldnote Paper Co.', hue: 50, bid: 3, copy: 'Notebooks that lie flat on the first page and the last.', why: 'Broad campaign. No targeting.' },
+  { id: 'a6', brand: 'Greenhouse Grocer', hue: 100, bid: 2, copy: 'Produce boxes from farms within 100 miles of you.', why: "You're in a city they deliver to." },
+];
+
+const FACTORS = [
+  { k: 'recency',   label: 'Fresh',             color: '--f1', desc: 'Newer posts rise. Fades over about eight hours.' },
+  { k: 'friends',   label: 'People you follow', color: '--f2', desc: 'Accounts you follow get a flat boost.' },
+  { k: 'spicy',     label: 'Spice',             color: '--f3', desc: 'Hot takes and debates. Public dislike counts feed this.' },
+  { k: 'wholesome', label: 'Wholesome',         color: '--f4', desc: 'Kind, cozy, made-something posts.' },
+  { k: 'discovery', label: 'Discovery',         color: '--f5', desc: "Accounts you don't follow yet." },
+  { k: 'popular',   label: 'Popular',           color: '--f6', desc: 'Likes, reposts and replies, on a log scale.' },
+];
+const PRESETS = {
+  balanced: { label: 'Balanced', recency: 60, friends: 55, spicy: 30, wholesome: 45, discovery: 35, popular: 50 },
+  chill:    { label: 'Chill',    recency: 40, friends: 70, spicy: 0,  wholesome: 95, discovery: 20, popular: 30 },
+  chaos:    { label: 'Chaos',    recency: 70, friends: 10, spicy: 100, wholesome: 0, discovery: 70, popular: 80 },
+  friends:  { label: 'Mostly friends', recency: 70, friends: 100, spicy: 20, wholesome: 40, discovery: 0, popular: 10 },
+  explore:  { label: 'Explore',  recency: 50, friends: 0,  spicy: 40, wholesome: 40, discovery: 100, popular: 60 },
+};
+
+const BADGES = [
+  { id: 'first-post', name: 'First words', desc: 'Publish a post', test: () => S.posts.some(p => p.by === 'me') },
+  { id: 'tuner', name: 'Tuner', desc: 'Change your algorithm', test: () => S.stats.tuned > 0 },
+  { id: 'paid', name: 'Paid to scroll', desc: 'Earn from an ad', test: () => S.me.earned > 0 },
+  { id: 'backer', name: 'Early backer', desc: 'Back a post with clout', test: () => S.stats.backs > 0 },
+  { id: 'duelist', name: 'Duelist', desc: 'Vote in a duel', test: () => S.stats.votes > 0 },
+  { id: 'patron', name: 'Patron', desc: 'Tip a creator', test: () => S.stats.tips > 0 },
+  { id: 'receipts', name: 'Owns it', desc: 'Edit a post in public', test: () => S.posts.some(p => p.by === 'me' && p.edits.length) },
+  { id: 'streak3', name: 'On a roll', desc: 'Reach a 3-day streak', test: () => S.me.streak >= 3 },
+];
+
+const AD_SHARE = 0.7, TIP_FEE = 0.08, HIST = 40, TICK_MS = 3500, KEY = 'bensocial.v1';
+
+/* ---------- state ---------- */
+function mkPost(p, now) {
+  const mom = p.mom ?? 0.01;
+  const hist = [];
+  let v = 8 + Math.sqrt(p.likes || 0) / 2;
+  for (let i = 0; i < HIST; i++) { v = Math.max(1, v * (1 + mom * 0.12 + rand(-0.02, 0.02))); hist.push(+v.toFixed(2)); }
+  return {
+    id: p.id, by: p.by, text: p.text, at: now - (p.mins || 0) * 6e4,
+    likes: p.likes || 0, dislikes: p.dislikes || 0, replies: p.replies || 0, reposts: p.reposts || 0,
+    tips: p.tips || 0, tippers: p.tippers || 0, spicy: p.spicy ?? .3, wholesome: p.wholesome ?? .4, mom,
+    price: hist[hist.length - 1], hist,
+    edits: (p.edits || []).map(e => ({ text: e.text, at: now - e.mins * 6e4 })),
+    editedAt: p.editedMins != null ? now - p.editedMins * 6e4 : null,
+    poll: p.poll ? { opts: p.poll.map(o => ({ ...o })), mine: null } : null,
+    thread: (p.thread || []).map(r => ({ by: r.by, text: r.text, at: now - r.mins * 6e4 })),
+    react: null, reposted: false,
+  };
+}
+function mkDuel(d, now, fresh) {
+  return { id: fresh ? d.id + '-' + now.toString(36) : d.id, base: d.id, title: d.title, endsAt: now + d.hours * 36e5, a: { ...d.a }, b: { ...d.b }, vote: null };
+}
+function seed() {
+  const now = Date.now();
+  return {
+    v: 1,
+    me: { name: 'You', handle: 'you', hue: 48, xp: 0, clout: 500, cash: 340, earned: 0, followers: 0, streak: 0, lastDay: null, days: [], dropDay: null, pro: false, joined: now },
+    dial: { ...PRESETS.balanced }, myPresets: [],
+    follows: ['maya', 'jun', 'kofi', 'priya'], muted: [],
+    posts: SEED_POSTS.map(p => mkPost(p, now)),
+    duels: DUEL_POOL.slice(0, 3).map(d => mkDuel(d, now)),
+    holdings: {}, adPrice: 4, badges: [],
+    ledger: [{ t: now, label: 'Starter balance (demo money)', c: 340 }],
+    notes: [{ t: now, text: 'Welcome to BenSocial. Your attention price is set to 4¢. Change it in Wallet.', read: false }],
+    stats: { backs: 0, tips: 0, tuned: 0, votes: 0, posts: 0 },
+    view: 'feed', tab: 'foryou', theme: null, welcomed: false, draft: '', incomingIx: 0,
+  };
+}
+function load() {
+  try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); if (s && s.v === 1 && Array.isArray(s.posts)) return s; } } catch (e) { /* storage unavailable */ }
+  return null;
+}
+let S = load() || seed();
+let saveTimer;
+function save() { clearTimeout(saveTimer); saveTimer = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* storage unavailable */ } }, 300); }
+
+const UI = { why: new Set(), open: new Set(), pop: null, editing: null, mood: null, incoming: [], seenAds: new Set(), rank: new Map(), resetArmed: false, editProfile: false, lastFocus: null };
+
+/* ---------- derived ---------- */
+const meUser = () => ({ name: S.me.name, handle: S.me.handle, hue: S.me.hue });
+const author = p => p.by === 'me' ? meUser() : USERS[p.by];
+const initials = n => n.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+const avatar = (u, cls = '') => `<span class="av ${cls}" style="--h:${u.hue}" aria-hidden="true">${esc(initials(u.name))}</span>`;
+const isFollowing = by => by === 'me' || S.follows.includes(by);
+const chg = p => (p.price - p.hist[0]) / p.hist[0];
+const postById = id => S.posts.find(p => p.id === id);
+function levelInfo(xp) { let lv = 1, need = 100, base = 0; while (xp >= base + need) { base += need; lv++; need = 100 + (lv - 1) * 50; } return { lv, into: xp - base, need }; }
+
+function factors(p) {
+  const ageH = (Date.now() - p.at) / 36e5;
+  const tot = p.likes + p.dislikes;
+  const contro = tot ? 2 * Math.min(p.likes, p.dislikes) / tot : 0;
+  const fol = isFollowing(p.by);
+  return {
+    recency: Math.exp(-ageH / 8),
+    friends: fol ? 1 : 0,
+    spicy: clamp(0.55 * p.spicy + 0.45 * contro, 0, 1),
+    wholesome: p.wholesome,
+    discovery: fol ? 0 : 1,
+    popular: clamp(Math.log10(1 + p.likes + 2 * p.reposts + p.replies) / 4.2, 0, 1),
+  };
+}
+function score(p) {
+  const f = factors(p); const parts = {}; let s = 0;
+  for (const F of FACTORS) { parts[F.k] = f[F.k] * S.dial[F.k] / 100; s += parts[F.k]; }
+  return { s, f, parts };
+}
+function ranked() {
+  const fresh = p => p.by === 'me' && Date.now() - p.at < 10 * 6e4;
+  return S.posts.filter(p => !S.muted.includes(p.by))
+    .map(p => [p, score(p).s + (fresh(p) ? 100 : 0)])
+    .sort((a, b) => b[1] - a[1]).map(x => x[0]);
+}
+function feedPosts() {
+  const list = S.posts.filter(p => !S.muted.includes(p.by));
+  if (S.tab === 'following') return list.filter(p => isFollowing(p.by)).sort((a, b) => b.at - a.at);
+  if (S.tab === 'latest') return list.sort((a, b) => b.at - a.at);
+  return ranked();
+}
+const eligibleAds = () => ADS.filter(a => a.bid >= S.adPrice).sort((a, b) => b.bid - a.bid);
+const unread = () => S.notes.filter(n => !n.read).length;
+function portfolio() {
+  let value = 0, cost = 0;
+  for (const [id, h] of Object.entries(S.holdings)) { const p = postById(id); if (!p) continue; value += h.shares * p.price; cost += h.cost; }
+  return { value, cost, pl: value - cost };
+}
+
+/* ---------- progression ---------- */
+function gainXP(n) {
+  const before = levelInfo(S.me.xp).lv;
+  S.me.xp += n;
+  const after = levelInfo(S.me.xp).lv;
+  if (after > before) {
+    const bonus = 50 * after;
+    S.me.clout += bonus;
+    toast(`Level ${after} reached. +${bonus} clout.`, { tone: 'accent' });
+    note(`You reached level ${after}.`);
+    burst($('[data-me="lv"]') || document.body);
+  }
+}
+function checkBadges() {
+  for (const b of BADGES) {
+    if (!S.badges.includes(b.id) && b.test()) {
+      S.badges.push(b.id);
+      gainXP(15);
+      toast(`Badge unlocked: ${b.name}. +15 XP`, { tone: 'accent' });
+    }
+  }
+}
+function touchStreak() {
+  const t = dayKey();
+  if (S.me.lastDay === t) return;
+  const y = new Date(); y.setDate(y.getDate() - 1);
+  S.me.streak = S.me.lastDay === dayKey(y) ? S.me.streak + 1 : 1;
+  S.me.lastDay = t;
+  S.me.days = [...S.me.days.filter(d => d !== t), t].slice(-30);
+}
+function note(text) {
+  S.notes.unshift({ t: Date.now(), text, read: false });
+  S.notes = S.notes.slice(0, 60);
+}
+function ledger(label, c) { S.ledger.unshift({ t: Date.now(), label, c }); S.ledger = S.ledger.slice(0, 80); }
+function commit() { checkBadges(); renderChrome(); save(); }
+
+/* ---------- templates ---------- */
+function spark(vals, w = 96, h = 28) {
+  const min = Math.min(...vals), max = Math.max(...vals), r = max - min || 1;
+  const pts = vals.map((v, i) => [i / (vals.length - 1) * w, h - 3 - (v - min) / r * (h - 6)]);
+  const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const last = pts[pts.length - 1];
+  const up = vals[vals.length - 1] >= vals[0];
+  return `<svg class="spark ${up ? 'up' : 'down'}" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true"><path class="spark-area" d="${d} L${w} ${h} L0 ${h} Z"/><path class="spark-line" d="${d}"/><circle class="spark-dot" cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.6"/></svg>`;
+}
+const chgSpan = p => { const c = chg(p); return `<span class="${c >= 0 ? 'up' : 'down'}" data-b="chg:${p.id}">${pct(c)}</span>`; };
+
+function postHTML(p) {
+  const u = author(p), mine = p.by === 'me', fol = !mine && S.follows.includes(p.by);
+  const editing = UI.editing === p.id;
+  const whyOpen = UI.why.has(p.id), threadOpen = UI.open.has(p.id);
+  return `<article class="post" data-post="${p.id}">
+    ${avatar(u)}
+    <div class="post-body">
+      <div class="post-head">
+        <span class="name">${esc(u.name)}</span>${mine && S.me.pro ? '<span class="pro-tag">PRO</span>' : ''}
+        <span class="handle">@${esc(u.handle)} · <time data-at="${p.at}">${ago(p.at)}</time></span>
+        ${mine ? (editing ? '' : `<button class="head-act" data-act="edit" data-id="${p.id}">Edit</button>`)
+               : `<button class="head-act ${fol ? 'on' : ''}" data-act="follow" data-id="${p.by}" aria-pressed="${fol}">${fol ? 'Following' : 'Follow'}</button>`}
+      </div>
+      ${editing ? `<form class="edit-form" data-form="edit" data-id="${p.id}">
+          <textarea id="edit-${p.id}" name="t" maxlength="500" aria-label="Edit post" required>${esc(p.text)}</textarea>
+          <p class="hint">Edits are public. The current version stays on a receipt anyone can open.</p>
+          <div class="row"><button type="button" class="btn ghost sm" data-act="cancelEdit">Cancel</button><button class="btn sm">Save edit</button></div>
+        </form>` : `<p class="post-text">${esc(p.text)}</p>`}
+      ${p.edits.length ? `<button class="receipt-link" data-act="receipts" data-id="${p.id}">${ic('receipt', 13)} Edited · ${p.edits.length + 1} versions</button>` : ''}
+      ${p.poll ? pollHTML(p) : ''}
+      <div class="post-meta">
+        <button class="clout-chip" data-act="pop" data-id="${p.id}" data-arg="back" aria-label="Clout price ${p.price.toFixed(1)}. Back this post">${ic('diamond', 13)}<span data-b="price:${p.id}">${p.price.toFixed(1)}</span>${chgSpan(p)}<span class="lbl">Back</span></button>
+        ${p.tips ? `<span class="tips-line">${money(p.tips)} in tips from ${fmt(p.tippers)} ${p.tippers === 1 ? 'person' : 'people'}</span>` : ''}
+      </div>
+      <div class="actions">
+        <button class="act love ${p.react === 'like' ? 'on' : ''}" data-act="like" data-id="${p.id}" aria-pressed="${p.react === 'like'}" aria-label="Like">${ic('heart')}<span data-b="likes:${p.id}">${fmt(p.likes)}</span></button>
+        <button class="act hate ${p.react === 'dislike' ? 'on' : ''}" data-act="dislike" data-id="${p.id}" aria-pressed="${p.react === 'dislike'}" aria-label="Dislike. Dislike counts are public">${ic('down')}<span data-b="dislikes:${p.id}">${fmt(p.dislikes)}</span></button>
+        <button class="act" data-act="reply" data-id="${p.id}" aria-expanded="${threadOpen}" aria-label="Replies">${ic('reply')}<span data-b="replies:${p.id}">${fmt(p.replies)}</span></button>
+        <button class="act rp ${p.reposted ? 'on' : ''}" data-act="repost" data-id="${p.id}" aria-pressed="${p.reposted}" aria-label="Repost">${ic('repost')}<span data-b="reposts:${p.id}">${fmt(p.reposts)}</span></button>
+        ${mine ? '' : `<button class="act" data-act="pop" data-id="${p.id}" data-arg="tip" aria-expanded="${UI.pop && UI.pop.id === p.id && UI.pop.kind === 'tip'}" aria-label="Tip ${esc(u.name)}">${ic('dollar')}<span class="act-l">Tip</span></button>`}
+        <button class="act" data-act="why" data-id="${p.id}" aria-expanded="${whyOpen}" aria-label="Why am I seeing this?">${ic('eye')}<span class="act-l">Why this?</span></button>
+      </div>
+      ${popHTML(p)}
+      ${whyOpen ? whyHTML(p) : ''}
+      ${threadOpen ? threadHTML(p) : ''}
+    </div>
+  </article>`;
+}
+
+function pollHTML(p) {
+  const tot = p.poll.opts.reduce((a, o) => a + o.v, 0), voted = p.poll.mine != null;
+  return `<div class="poll">${p.poll.opts.map((o, i) => {
+    const share = tot ? Math.round(o.v / tot * 100) : 0;
+    return voted
+      ? `<div class="poll-row ${p.poll.mine === i ? 'mine' : ''}"><span class="poll-fill" style="width:${share}%"></span><span>${esc(o.l)}${p.poll.mine === i ? ' · your vote' : ''}</span><b>${share}%</b></div>`
+      : `<button class="poll-opt" data-act="poll" data-id="${p.id}" data-arg="${i}">${esc(o.l)}</button>`;
+  }).join('')}<p class="poll-meta">${fmt(tot)} votes${voted ? '' : ' · vote to see results'}</p></div>`;
+}
+
+function popHTML(p) {
+  if (!UI.pop || UI.pop.id !== p.id) return '';
+  const u = author(p);
+  if (UI.pop.kind === 'tip') {
+    return `<div class="pop" role="group" aria-label="Tip">
+      <div class="pop-row">${[100, 300, 500].map(c => `<button class="btn sm ${S.me.cash < c ? 'ghost' : ''}" data-act="tip" data-id="${p.id}" data-arg="${c}">Tip ${money(c)}</button>`).join('')}</div>
+      <p class="fine">From a $1 tip, ${esc(u.name.split(' ')[0])} gets $0.92 and BenSocial keeps $0.08. Your wallet: <b data-me="cash">${money(S.me.cash)}</b></p>
+    </div>`;
+  }
+  const h = S.holdings[p.id];
+  return `<div class="pop" role="group" aria-label="Back this post">
+    <div class="pop-row">${[25, 100, 250].map(c => `<button class="btn sm" data-act="back" data-id="${p.id}" data-arg="${c}" ${S.me.clout < c ? 'disabled' : ''}>Back ${c}</button>`).join('')}</div>
+    <p class="fine">One share costs <b data-b="price:${p.id}">${p.price.toFixed(1)}</b> clout. If this post takes off, your shares rise with it. You have <b data-me="clout">${fmt(Math.floor(S.me.clout))}</b> clout${h ? ` and hold ${h.shares.toFixed(2)} shares` : ''}.</p>
+  </div>`;
+}
+
+function whyHTML(p) {
+  const { s, f, parts } = score(p);
+  const rank = UI.rank.get(p.id);
+  return `<section class="why" aria-label="Why you're seeing this post">
+    <div class="why-head"><span class="eyebrow">Why you're seeing this</span><span class="mono muted">${S.tab === 'foryou' && rank ? `#${rank} of ${UI.rank.size} · ` : ''}score ${s.toFixed(2)}</span></div>
+    <div class="why-bar" aria-hidden="true">${FACTORS.map(F => `<span style="flex:${parts[F.k].toFixed(3)} 1 0;background:var(${F.color})"></span>`).join('')}</div>
+    <div class="tbl-wrap"><table class="why-table"><tbody>${FACTORS.map(F => `<tr><th><i class="sw" style="background:var(${F.color})"></i>${F.label}</th><td>${f[F.k].toFixed(2)}</td><td>× ${S.dial[F.k]}%</td><td>${parts[F.k].toFixed(2)}</td></tr>`).join('')}</tbody></table></div>
+    ${S.tab !== 'foryou' ? `<p class="why-note">${S.tab === 'latest' ? 'Latest' : 'Following'} isn't ranked. This post is here because of when it was posted. The score above is what it gets in For you.</p>` : ''}
+    <div class="why-actions">
+      <button class="chip" data-act="less" data-arg="spicy">Less spice</button>
+      <button class="chip" data-act="less" data-arg="wholesome">Less wholesome</button>
+      ${p.by !== 'me' ? `<button class="chip" data-act="mute" data-id="${p.by}">Hide @${esc(author(p).handle)}</button>` : ''}
+      <button class="chip" data-act="go" data-arg="algo">${ic('sliders', 14)} Your algorithm</button>
+    </div>
+  </section>`;
+}
+
+function threadHTML(p) {
+  const handle = author(p).handle;
+  return `<div class="thread">
+    ${p.thread.map(r => { const u = r.by === 'me' ? meUser() : USERS[r.by]; return `<div class="reply">${avatar(u, 'sm')}<div><b>${esc(u.name)}</b> <span class="handle">@${esc(u.handle)} · ${ago(r.at)}</span><p>${esc(r.text)}</p></div></div>`; }).join('')}
+    <form class="reply-form" data-form="reply" data-id="${p.id}">
+      <input id="reply-${p.id}" name="t" maxlength="280" placeholder="Reply to @${esc(handle)}" aria-label="Reply to @${esc(handle)}" required autocomplete="off">
+      <button class="btn sm">Reply</button>
+    </form>
+  </div>`;
+}
+
+function adHTML(a) {
+  const pay = a.bid * AD_SHARE, paid = UI.seenAds.has(a.id);
+  return `<aside class="ad" data-ad="${a.id}" aria-label="Sponsored by ${esc(a.brand)}">
+    ${avatar({ name: a.brand, hue: a.hue }, 'sq')}
+    <div class="post-body">
+      <div class="ad-head"><span class="name">${esc(a.brand)}</span><span class="eyebrow">Sponsored</span>
+        <span class="ad-pay ${paid ? 'paid' : ''}">${paid ? ic('check', 13) + ' Paid you ' : 'Pays you '}${cents(pay)}</span></div>
+      <p class="ad-copy">${esc(a.copy)}</p>
+      <div class="ad-receipt"><span>Bid <b>${cents(a.bid)}</b></span><span>You <b>${cents(pay)}</b></span><span>BenSocial <b>${cents(a.bid - pay)}</b></span><span>Why you: <b>${esc(a.why)}</b></span></div>
+    </div>
+  </aside>`;
+}
+
+/* ---------- views ---------- */
+const NAV = [
+  { v: 'feed', label: 'Home', short: 'Home', icon: 'home' },
+  { v: 'algo', label: 'Your algorithm', short: 'Algorithm', icon: 'sliders' },
+  { v: 'market', label: 'Clout Market', short: 'Market', icon: 'trend' },
+  { v: 'duels', label: 'Duels', short: 'Duels', icon: 'zap' },
+  { v: 'wallet', label: 'Wallet', short: 'Wallet', icon: 'wallet' },
+  { v: 'activity', label: 'Activity', short: 'Activity', icon: 'bell' },
+  { v: 'profile', label: 'Profile', short: 'Profile', icon: 'user' },
+];
+
+function feedListHTML() {
+  const posts = feedPosts(), ads = eligibleAds();
+  UI.rank = new Map(ranked().map((p, i) => [p.id, i + 1]));
+  const out = []; let ai = 0;
+  posts.forEach((p, i) => {
+    out.push(postHTML(p));
+    if (ads.length && (i === 2 || (i > 2 && (i - 2) % 5 === 0))) out.push(adHTML(ads[ai++ % ads.length]));
+  });
+  if (!posts.length) out.push(`<div class="empty">${S.tab === 'following' ? 'Nobody you follow has posted yet. Follow people from For you.' : 'Nothing here yet.'}</div>`);
+  return out.join('');
+}
+
+function welcomeHTML() {
+  if (S.welcomed) return '';
+  const items = [
+    ['sliders', 'The algorithm is public', 'Every post shows its score. You set the weights.'],
+    ['wallet', 'You get paid for ads', 'Set your price. Keep 70% of every bid.'],
+    ['down', 'Dislikes are public', 'A ratio is information. We show it.'],
+    ['receipt', 'Edits leave receipts', 'Change a post and every version stays visible.'],
+  ];
+  return `<section class="welcome" aria-label="Welcome">
+    <button class="icon-btn x" data-act="dismissWelcome" aria-label="Dismiss">${ic('x')}</button>
+    <h2>The social network with <mark>nothing to hide</mark>.</h2>
+    <ul>${items.map(([i, b, s]) => `<li>${ic(i)}<div><b>${b}</b><span>${s}</span></div></li>`).join('')}</ul>
+  </section>`;
+}
+
+function composerHTML() {
+  const moods = [['spicy', 'Hot take'], ['wholesome', 'Wholesome'], ['question', 'Question']];
+  return `<form class="composer" id="composeForm" data-form="compose">
+    ${avatar(meUser())}
+    <div>
+      <label class="eyebrow" for="composeText">New post</label>
+      <textarea id="composeText" name="t" maxlength="500" placeholder="Say something. Edits are public, so mean it.">${esc(S.draft || '')}</textarea>
+      <div class="composer-row">
+        ${moods.map(([k, l]) => `<button type="button" class="chip" data-act="mood" data-arg="${k}" aria-pressed="${UI.mood === k}">${l}</button>`).join('')}
+        <span class="spacer"></span>
+        <span class="count" id="composeCount">${(S.draft || '').length}/500</span>
+        <button class="btn sm">Post</button>
+      </div>
+    </div>
+  </form>`;
+}
+
+function dropReady() { return S.me.dropDay !== dayKey(); }
+function dropBanner() {
+  if (!dropReady()) return '';
+  return `<div class="drop-banner only-narrow">${ic('gift', 22)}<p><b>Your daily drop is ready.</b> Open it for free clout. Day ${S.me.streak} of your streak.</p><button class="btn sm" data-act="drop">Open</button></div>`;
+}
+
+const VIEWS = {
+  feed() {
+    const sub = {
+      foryou: `Ranked by <button class="link" data-act="go" data-arg="algo">your algorithm</button>. Tap “Why this?” on any post to see its score.`,
+      following: 'People you follow, newest first. No ranking.',
+      latest: 'Everything, newest first. The algorithm is off.',
+    }[S.tab];
+    return `<div class="view-head"><h1 class="view-title">Home</h1>
+      <div class="tabs" role="tablist" aria-label="Feed">${[['foryou', 'For you'], ['following', 'Following'], ['latest', 'Latest']].map(([k, l]) => `<button role="tab" class="tab" aria-selected="${S.tab === k}" data-act="tab" data-arg="${k}">${l}</button>`).join('')}</div></div>
+      <p class="view-sub">${sub}</p>
+      ${welcomeHTML()}
+      ${composerHTML()}
+      ${dropBanner()}
+      <div class="new-pill-wrap" id="newPill"></div>
+      <div class="feed" id="feedList">${feedListHTML()}</div>`;
+  },
+
+  algo() {
+    return `<div class="view-head"><h1 class="view-title">Your algorithm</h1></div>
+      <p class="lede">Other apps rank your feed with a formula they keep secret. This is ours, in full. Move a slider and <b>For you</b> re-ranks right away.</p>
+      <div class="formula mono" id="formula">${formulaHTML()}</div>
+      <div class="presets" role="group" aria-label="Presets">
+        ${Object.entries(PRESETS).map(([k, pr]) => `<button class="chip" data-act="preset" data-arg="${k}" aria-pressed="${matches(pr)}">${pr.label}</button>`).join('')}
+        ${S.myPresets.map((pr, i) => `<button class="chip" data-act="myPreset" data-arg="${i}" aria-pressed="${matches(pr)}">${esc(pr.label)}</button>`).join('')}
+        <button class="chip" data-act="savePreset">${ic(S.me.pro ? 'plus' : 'lock', 14)} Save preset${S.me.pro ? '' : ' · Pro'}</button>
+      </div>
+      <div class="dials">${FACTORS.map(F => `<div class="dial">
+        <div class="dial-top"><label for="dial-${F.k}"><i class="sw" style="background:var(${F.color})"></i>${F.label}</label><output id="out-${F.k}" for="dial-${F.k}" class="mono">${S.dial[F.k]}%</output></div>
+        <input type="range" id="dial-${F.k}" min="0" max="100" step="5" value="${S.dial[F.k]}" data-dial="${F.k}" style="--c:var(${F.color})">
+        <p class="dial-desc">${F.desc}</p></div>`).join('')}</div>
+      <section class="panel"><div class="panel-head"><h2 class="h2">Top of your For you right now</h2><button class="link small" data-act="go" data-arg="feed">Open feed</button></div><ol class="preview" id="dialPreview">${previewHTML()}</ol></section>
+      <section class="panel"><h2 class="h2">Hidden accounts</h2>${S.muted.length
+        ? S.muted.map(by => `<div class="list-row"><span class="me-row">${avatar(USERS[by], 'sm')}<span>@${esc(USERS[by].handle)}</span></span><button class="btn ghost sm" data-act="unmute" data-id="${by}">Show again</button></div>`).join('')
+        : '<p class="muted small">Nobody is hidden. Use “Why this?” on any post to hide an account.</p>'}</section>`;
+  },
+
+  market() {
+    const pf = portfolio();
+    const held = Object.keys(S.holdings).map(postById).filter(Boolean);
+    const rising = S.posts.filter(p => !S.muted.includes(p.by)).sort((a, b) => chg(b) - chg(a)).slice(0, 10);
+    return `<div class="view-head"><h1 class="view-title">Clout Market</h1></div>
+      <p class="lede">Back posts before they take off. When a post climbs, so do your shares. Clout is earned on BenSocial and can never be bought or cashed out for money, so this is bragging rights, not gambling.</p>
+      <div class="kpis">
+        <div class="kpi"><b data-me="clout">${fmt(Math.floor(S.me.clout))}</b><span>Clout to spend</span></div>
+        <div class="kpi"><b data-b="pf:value">${fmt(pf.value)}</b><span>Your positions</span></div>
+        <div class="kpi"><b data-b="pf:pl" class="${pf.pl >= 0 ? 'up' : 'down'}">${pf.pl >= 0 ? '+' : '−'}${fmt(Math.abs(pf.pl))}</b><span>Profit or loss</span></div>
+      </div>
+      ${held.length ? `<section class="panel"><h2 class="h2">Your positions</h2><div>${held.map(p => marketRow(p, true)).join('')}</div></section>` : ''}
+      <section class="panel"><div class="panel-head"><h2 class="h2">Rising now</h2><span class="fine">Change over the last few minutes</span></div><div>${rising.map(p => marketRow(p, false)).join('')}</div></section>`;
+  },
+
+  duels() {
+    return `<div class="view-head"><h1 class="view-title">Duels</h1></div>
+      <p class="lede">Two people, one question, a few hours on the clock. Pick a side to see the split. If your side wins, you get 100 clout.</p>
+      ${S.duels.map(duelHTML).join('')}`;
+  },
+
+  wallet() {
+    const elig = eligibleAds();
+    return `<div class="view-head"><h1 class="view-title">Wallet</h1></div>
+      <section class="panel">
+        <div class="balance"><div><span class="eyebrow">Balance · demo money</span><div class="big-num" data-me="cash">${money(S.me.cash)}</div><p class="muted small">Earned from ads: <b data-me="earned">${money(S.me.earned)}</b></p></div>
+        <div class="row"><button class="btn ghost sm" data-act="addFunds">Add $5</button><button class="btn sm" data-act="cashout">Cash out</button></div></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2 class="h2">Your attention price</h2><output class="price-out" id="priceOut" for="adPrice">${S.adPrice}¢</output></div>
+        <p class="muted small">Advertisers bid to show you an ad. Below your price, they don't get in. A higher price means fewer ads and more money per ad. You keep 70% of every winning bid.</p>
+        <label class="eyebrow" for="adPrice">Minimum bid per ad</label>
+        <input type="range" id="adPrice" min="1" max="20" step="1" value="${S.adPrice}">
+        <div class="scale" aria-hidden="true"><span>1¢</span><span>10¢</span><span>20¢</span></div>
+        <p class="small" id="priceSummary">${priceSummary(elig)}</p>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Advertiser</th><th class="num">Bid</th><th class="num">You get</th><th>Status</th></tr></thead>
+          <tbody id="bidRows">${bidRows()}</tbody></table></div>
+      </section>
+      <section class="panel">
+        <h2 class="h2">Open books</h2>
+        <p class="muted small">How BenSocial makes money, every split, in public.</p>
+        <div class="books">
+          ${bookHTML('Ads', 70, 'You 70% · BenSocial 30%')}
+          ${bookHTML('Tips', 92, 'Creator 92% · BenSocial 8%')}
+          ${bookHTML('Pro', 0, '$7.99/month · 100% BenSocial')}
+          ${bookHTML('Your data', null, 'Sold to anyone: $0. Never.')}
+        </div>
+      </section>
+      <section class="panel"><h2 class="h2">Ledger</h2><ul class="ledger">${S.ledger.slice(0, 25).map(l => `<li><span>${esc(l.label)} <span class="fine">${ago(l.t)}</span></span><span class="mono ${l.c >= 0 ? 'up' : 'down'}">${l.c >= 0 ? '+' : ''}${Math.abs(l.c) < 100 ? (l.c < 0 ? '−' : '') + cents(Math.abs(l.c)) : money(l.c)}</span></li>`).join('')}</ul></section>`;
+  },
+
+  activity() {
+    return `<div class="view-head"><h1 class="view-title">Activity</h1></div>
+      <p class="view-sub">Likes, backers, followers and duel results. Everyone here is simulated in this demo.</p>
+      ${S.notes.length ? `<ul class="notes">${S.notes.map(n => `<li class="${n.read ? '' : 'unread'}"><span class="dot"></span><span>${n.text}</span><time>${ago(n.t)}</time></li>`).join('')}</ul>` : '<div class="empty">Nothing yet.</div>'}`;
+  },
+
+  profile() {
+    const L = levelInfo(S.me.xp), mine = S.posts.filter(p => p.by === 'me');
+    return `<section class="panel">
+        <div class="profile-card">${avatar(meUser(), 'lg')}<div>
+          <div class="profile-name"><span>${esc(S.me.name)}</span>${S.me.pro ? '<span class="pro-tag">PRO</span>' : ''}</div>
+          <p class="muted">@${esc(S.me.handle)} · <span data-me="followers">${fmt(S.me.followers)}</span> followers · following ${S.follows.length}</p></div>
+          <button class="btn ghost sm" data-act="editProfile" aria-expanded="${UI.editProfile}">${ic('edit', 14)} Edit profile</button></div>
+        ${UI.editProfile ? `<form data-form="profile" class="form-grid">
+          <label>Name<input class="field" id="pf-name" name="name" maxlength="40" value="${esc(S.me.name)}" required></label>
+          <label>Handle<input class="field" id="pf-handle" name="handle" maxlength="20" pattern="[A-Za-z0-9._]+" value="${esc(S.me.handle)}" required></label>
+          <div class="row" style="grid-column:1/-1"><button type="button" class="btn ghost sm" data-act="editProfile">Cancel</button><button class="btn sm">Save</button></div></form>` : ''}
+        <div class="stats">
+          <div><b data-me="lv">Lv ${L.lv}</b><span>Level</span></div>
+          <div><b data-me="streak">${S.me.streak}</b><span>Day streak</span></div>
+          <div><b data-me="clout">${fmt(Math.floor(S.me.clout))}</b><span>Clout</span></div>
+          <div><b data-me="followers">${fmt(S.me.followers)}</b><span>Followers</span></div>
+          <div><b data-me="earned">${money(S.me.earned)}</b><span>Ad earnings</span></div>
+        </div>
+        <div><div class="list-row small"><span class="muted">Progress to level ${L.lv + 1}</span><span class="mono" data-me="xptext">${L.into} / ${L.need} XP</span></div><div class="xp" style="margin-top:6px"><i data-me="xp" style="width:${(L.into / L.need * 100).toFixed(1)}%"></i></div></div>
+      </section>
+      <div class="only-narrow" style="flex-direction:column;gap:14px;margin-bottom:16px">${streakCard()}</div>
+      <section class="panel"><div class="panel-head"><h2 class="h2">Badges</h2><span class="fine">${S.badges.length} of ${BADGES.length}</span></div>
+        <div class="badges">${BADGES.map(b => { const on = S.badges.includes(b.id); return `<div class="badge-card ${on ? '' : 'off'}">${ic(on ? 'award' : 'lock')}<b>${b.name}</b><span>${b.desc}</span></div>`; }).join('')}</div></section>
+      <section class="panel"><h2 class="h2">Settings</h2>
+        <div class="list-row"><span>BenSocial Pro</span>${S.me.pro ? '<button class="btn ghost sm" data-act="pro">Manage</button>' : '<button class="btn sm" data-act="pro">Try Pro</button>'}</div>
+        <div class="list-row"><span>Appearance</span><button class="btn ghost sm" data-act="theme">${themeLabel()}</button></div>
+        <div class="list-row"><span>Demo data</span><button class="btn ghost sm" data-act="reset">${UI.resetArmed ? 'Tap again to erase everything' : 'Reset demo'}</button></div>
+      </section>
+      <h2 class="h2" style="margin:6px 0 12px">Your posts</h2>
+      <div class="feed">${mine.length ? mine.map(postHTML).join('') : `<div class="empty">You haven't posted yet. <button class="link" data-act="compose">Write your first post</button></div>`}</div>`;
+  },
+};
+
+function formulaHTML() {
+  return `<span class="k">score =</span> ` + FACTORS.map(F => `<span class="term"><i class="sw" style="background:var(${F.color})"></i>${(S.dial[F.k] / 100).toFixed(2)}×${F.k}</span>`).join(' <span class="k">+</span> ');
+}
+function previewHTML() {
+  return ranked().slice(0, 5).map(p => { const u = author(p); return `<li>${avatar(u, 'sm')}<span class="snip"><b>@${esc(u.handle)}</b> ${esc(p.text)}</span><span class="mono small muted">${score(p).s.toFixed(2)}</span></li>`; }).join('');
+}
+const matches = pr => FACTORS.every(F => pr[F.k] === S.dial[F.k]);
+
+function marketRow(p, held) {
+  const u = author(p), h = S.holdings[p.id];
+  let right;
+  if (held && h) {
+    const val = h.shares * p.price, pl = val - h.cost;
+    right = `<div class="px"><span data-b="hv:${p.id}">${fmt(val)}</span><small data-b="hpl:${p.id}" class="${pl >= 0 ? 'up' : 'down'}">${pl >= 0 ? '+' : '−'}${fmt(Math.abs(pl))}</small></div><button class="btn ghost sm" data-act="sell" data-id="${p.id}">Cash out</button>`;
+  } else {
+    right = `<div class="px"><span data-b="price:${p.id}">${p.price.toFixed(1)}</span><small>${chgSpan(p)}</small></div><button class="btn sm" data-act="back" data-id="${p.id}" data-arg="50" ${S.me.clout < 50 ? 'disabled' : ''}>Back 50</button>`;
+  }
+  return `<div class="mrow">${avatar(u, 'sm')}<div style="min-width:0"><div class="who">@${esc(u.handle)}${held && h ? ` · ${h.shares.toFixed(2)} shares` : ''}</div><div class="snip">${esc(p.text)}</div></div><div class="spark-cell" data-spark="${p.id}">${spark(p.hist)}</div>${right}</div>`;
+}
+
+function timeLeft(d) {
+  const ms = d.endsAt - Date.now();
+  if (ms <= 0) return 'Ended';
+  const h = Math.floor(ms / 36e5), m = Math.floor(ms % 36e5 / 6e4);
+  return `${h}h ${m}m left`;
+}
+const winner = d => d.a.v >= d.b.v ? 'a' : 'b';
+function settle(d) {
+  d.settled = true;
+  if (!d.vote) return;
+  if (winner(d) === d.vote) { S.me.clout += 100; note(`You called it. “${esc(d.title)}” went your way. +100 clout`); toast(`“${esc(d.title)}” ended. Your side won: +100 clout.`, { tone: 'accent' }); }
+  else note(`“${esc(d.title)}” ended. Your side lost this one.`);
+}
+function duelHTML(d) {
+  const tot = d.a.v + d.b.v, ended = d.endsAt <= Date.now();
+  const sa = tot ? Math.round(d.a.v / tot * 100) : 50;
+  const side = (k) => {
+    const s = d[k], u = USERS[s.by];
+    return `<div class="side ${d.vote === k ? 'mine' : ''}"><div class="side-who">${avatar(u, 'sm')}<span><b>${esc(u.name)}</b><br><span class="muted">@${esc(u.handle)}</span></span></div><p>${esc(s.take)}</p>
+      ${d.vote || ended ? `<span class="eyebrow">${[d.vote === k ? 'Your side' : '', ended && winner(d) === k ? 'Winner' : ''].filter(Boolean).join(' · ')}</span>` : `<button class="btn sm block" data-act="vote" data-id="${d.id}" data-arg="${k}">Side with ${esc(u.name.split(' ')[0])}</button>`}</div>`;
+  };
+  return `<article class="duel" data-duel="${d.id}">
+    <div class="duel-top"><span class="eyebrow">Duel · <span data-b="left:${d.id}">${timeLeft(d)}</span></span><span class="eyebrow"><span data-b="dvt:${d.id}">${fmt(tot)}</span> votes</span></div>
+    <h2>${esc(d.title)}</h2>
+    <div class="sides">${side('a')}<span class="vs">VS</span>${side('b')}</div>
+    ${d.vote || ended ? `<div class="split" aria-label="${sa}% to ${100 - sa}%"><div class="a" data-b="dsa:${d.id}" style="flex-basis:${sa}%">${sa}%</div><div class="b" data-b="dsb:${d.id}" style="flex-basis:${100 - sa}%">${100 - sa}%</div></div>`
+      : `<div class="locked">${ic('lock', 14)} Pick a side to see the split</div>`}
+  </article>`;
+}
+
+function priceSummary(elig) {
+  const perDay = elig.reduce((a, x) => a + x.bid * AD_SHARE * 3, 0);
+  return `<b>${elig.length} of ${ADS.length}</b> advertisers clear your price. At about three views each per day, that's roughly <b class="mono">${money(perDay)}</b> a day.`;
+}
+function bidRows() {
+  return ADS.map(a => { const ok = a.bid >= S.adPrice; return `<tr><td>${esc(a.brand)}</td><td class="num">${cents(a.bid)}</td><td class="num">${cents(a.bid * AD_SHARE)}</td><td><span class="status ${ok ? 'ok' : 'no'}">${ok ? 'Shown' : 'Below your price'}</span></td></tr>`; }).join('');
+}
+function bookHTML(title, share, line) {
+  const bar = share == null ? `<div class="bar"><i style="flex:1;background:var(--gain)"></i></div>`
+    : `<div class="bar"><i style="flex:${share};background:var(--gain)"></i><i style="flex:${100 - share};background:var(--accent)"></i></div>`;
+  return `<div class="book"><b>${title}</b>${bar}<p>${line}</p></div>`;
+}
+
+/* ---------- live rail ---------- */
+function streakCard() {
+  const days = [];
+  for (let i = 6; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); days.push({ k: dayKey(d), l: d.toLocaleDateString('en-US', { weekday: 'narrow' }) }); }
+  const L = levelInfo(S.me.xp);
+  return `<div class="card">
+    <div class="streak"><span class="flame">${ic('flame', 24)}</span><div><b data-me="streak">${S.me.streak}</b> <span class="muted">day streak</span><p class="fine">Come back tomorrow to keep it.</p></div></div>
+    <div class="days">${days.map(d => `<span class="${S.me.days.includes(d.k) ? 'on' : ''}"><i></i>${d.l}</span>`).join('')}</div>
+    ${dropReady() ? `<button class="btn block" data-act="drop">${ic('gift')} Open daily drop</button>` : `<button class="btn ghost block" disabled>${ic('check')} Drop opened. Next one tomorrow</button>`}
+    <div class="list-row small"><span data-me="level">Level ${L.lv}</span><span class="mono muted" data-me="xptext">${L.into} / ${L.need} XP</span></div>
+    <div class="xp"><i data-me="xp" style="width:${(L.into / L.need * 100).toFixed(1)}%"></i></div>
+  </div>`;
+}
+function renderLive() {
+  const live = $('#live');
+  if (!live || getComputedStyle(live).display === 'none') return;
+  const movers = S.posts.filter(p => !S.muted.includes(p.by)).sort((a, b) => chg(b) - chg(a)).slice(0, 3);
+  const d = S.duels.find(x => !x.vote && x.endsAt > Date.now()) || S.duels[0];
+  live.innerHTML = `${streakCard()}
+    <div class="card"><div class="card-head"><span class="eyebrow">Rising on the market</span><button class="link small" data-act="go" data-arg="market">Open</button></div>
+      ${movers.map(p => { const u = author(p); return `<button class="mini" data-act="go" data-arg="market">${avatar(u, 'sm')}<span style="min-width:0"><span class="who">@${esc(u.handle)}</span><span class="snip" style="display:block">${esc(p.text)}</span></span>${chgSpan(p)}</button>`; }).join('')}</div>
+    ${d ? `<div class="card"><div class="card-head"><span class="eyebrow">Live duel</span><span class="fine">${timeLeft(d)}</span></div><b>${esc(d.title)}</b><p class="small muted">@${esc(USERS[d.a.by].handle)} vs @${esc(USERS[d.b.by].handle)} · ${fmt(d.a.v + d.b.v)} votes</p><button class="btn ghost sm" data-act="go" data-arg="duels">${d.vote ? 'See the split' : 'Pick a side'}</button></div>` : ''}
+    <p class="fine" style="padding:0 4px">Demo mode: every account, post, ad and dollar here is simulated and stays in this browser.</p>`;
+}
+
+/* ---------- shell ---------- */
+function themeLabel() {
+  const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  return dark ? 'Switch to light' : 'Switch to dark';
+}
+function buildShell() {
+  const L = levelInfo(S.me.xp);
+  $('#rail').innerHTML = `
+    <div><span class="logo">Ben<mark>Social</mark></span><p class="tagline">Nothing to hide.</p></div>
+    <div class="nav">${NAV.map(n => `<button class="nav-item" data-act="go" data-arg="${n.v}" data-nav="${n.v}">${ic(n.icon, 20)}<span>${n.label}</span>${n.v === 'activity' ? `<span class="badge" data-me="unread" hidden></span>` : ''}</button>`).join('')}</div>
+    <button class="btn block" data-act="compose">${ic('plus')} New post</button>
+    <div class="me-card">
+      <div class="me-row">${avatar(meUser())}<div><div class="me-name">${esc(S.me.name)}${S.me.pro ? ' <span class="pro-tag">PRO</span>' : ''}</div><div class="me-sub"><span data-me="lv">Lv ${L.lv}</span> · <span data-me="streak">${S.me.streak}</span>-day streak</div></div></div>
+      <div class="xp"><i data-me="xp"></i></div>
+      <div class="stat-pair"><div><b data-me="cash">${money(S.me.cash)}</b><span>Wallet</span></div><div><b data-me="clout">${fmt(S.me.clout)}</b><span>Clout</span></div></div>
+    </div>
+    <div class="rail-foot">
+      ${S.me.pro ? '' : `<button data-act="pro">${ic('star', 15)}<span>Try BenSocial Pro</span></button>`}
+      <button data-act="theme">${ic('moon', 15)}<span data-theme-label>${themeLabel()}</span></button>
+    </div>`;
+  $('#topbar').innerHTML = `<span class="logo">Ben<mark>Social</mark></span><span class="spacer"></span>
+    <span class="pill-stat" aria-label="Clout">${ic('diamond', 13)}<span data-me="clout"></span></span>
+    <button class="icon-btn" data-act="go" data-arg="activity" aria-label="Activity">${ic('bell', 20)}<span class="badge" data-me="unread" hidden></span></button>
+    <button class="icon-btn" data-act="go" data-arg="profile" aria-label="Profile">${avatar(meUser(), 'sm')}</button>`;
+  $('#tabbar').innerHTML = NAV.filter(n => ['feed', 'algo', 'market', 'duels', 'wallet'].includes(n.v)).map(n => `<button data-act="go" data-arg="${n.v}" data-nav="${n.v}">${ic(n.icon, 22)}<span>${n.short}</span></button>`).join('');
+  $('.modal-x').innerHTML = ic('x');
+}
+function renderChrome() {
+  const L = levelInfo(S.me.xp), n = unread();
+  $$('[data-me]').forEach(el => {
+    switch (el.dataset.me) {
+      case 'cash': el.textContent = money(S.me.cash); break;
+      case 'earned': el.textContent = money(S.me.earned); break;
+      case 'clout': el.textContent = fmt(Math.floor(S.me.clout)); break;
+      case 'level': el.textContent = 'Level ' + L.lv; break;
+      case 'lv': el.textContent = 'Lv ' + L.lv; break;
+      case 'xptext': el.textContent = `${L.into} / ${L.need} XP`; break;
+      case 'xp': el.style.width = (L.into / L.need * 100).toFixed(1) + '%'; break;
+      case 'streak': el.textContent = S.me.streak; break;
+      case 'followers': el.textContent = fmt(S.me.followers); break;
+      case 'unread': el.textContent = n > 9 ? '9+' : n; el.hidden = !n; break;
+    }
+  });
+  $$('[data-nav]').forEach(el => el.dataset.nav === S.view ? el.setAttribute('aria-current', 'page') : el.removeAttribute('aria-current'));
+  $$('[data-theme-label]').forEach(el => el.textContent = themeLabel());
+}
+function render(focus) {
+  $('#view').innerHTML = VIEWS[S.view]();
+  if (S.view === 'activity') S.notes.forEach(n => n.read = true);
+  if (S.view === 'feed') { observeAds(); renderPill(); }
+  renderLive();
+  renderChrome();
+  if (focus) $('#view').focus({ preventScroll: true });
+}
+function renderFeed() {
+  const el = $('#feedList'); if (!el) return;
+  el.innerHTML = feedListHTML();
+  observeAds();
+}
+function rerenderPost(id) {
+  const p = postById(id); if (!p) return;
+  $$(`[data-post="${id}"]`).forEach(el => { el.outerHTML = postHTML(p); });
+}
+function renderPill() {
+  const el = $('#newPill'); if (!el) return;
+  const n = UI.incoming.length;
+  el.innerHTML = n ? `<button class="new-pill" data-act="showNew">${ic('up', 16)} Show ${n} new post${n > 1 ? 's' : ''}</button>` : '';
+}
+function renderTicker() {
+  const movers = [...S.posts].sort((a, b) => Math.abs(chg(b)) - Math.abs(chg(a))).slice(0, 6);
+  const items = [
+    `<span class="tk"><span class="tk-live">LIVE</span></span>`,
+    ...movers.map(p => `<span class="tk"><b>@${esc(author(p).handle)}</b> ${p.price.toFixed(1)} <span class="${chg(p) >= 0 ? 'up' : 'down'}">${pct(chg(p))}</span></span>`),
+    ...ADS.slice(0, 3).map(a => `<span class="tk"><b>${esc(a.brand)}</b> bids ${cents(a.bid)} per view</span>`),
+    ...S.duels.map(d => `<span class="tk"><b>${esc(d.title)}</b> ${fmt(d.a.v + d.b.v)} votes</span>`),
+    `<span class="tk">Your price <b>${S.adPrice}¢</b></span>`,
+  ].join('');
+  $('#ticker').innerHTML = items + items;
+}
+
+/* ---------- ads seen = money earned ---------- */
+let adObserver = null;
+function observeAds() {
+  if (!('IntersectionObserver' in window)) return;
+  if (adObserver) adObserver.disconnect();
+  adObserver = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      const id = e.target.dataset.ad;
+      if (UI.seenAds.has(id)) continue;
+      const a = ADS.find(x => x.id === id);
+      if (!a || a.bid < S.adPrice) continue;
+      UI.seenAds.add(id);
+      const pay = a.bid * AD_SHARE;
+      S.me.cash += pay; S.me.earned += pay;
+      ledger(`Ad view · ${a.brand}`, pay);
+      $$(`[data-ad="${id}"] .ad-pay`).forEach(el => { el.classList.add('paid'); el.innerHTML = ic('check', 13) + ' Paid you ' + cents(pay); });
+      toast(`+${cents(pay)} from ${esc(a.brand)} for your attention`);
+      commit();
+    }
+  }, { threshold: 0.6 });
+  $$('[data-ad]').forEach(el => adObserver.observe(el));
+}
+
+/* ---------- toasts, bursts, modal ---------- */
+function toast(msg, { tone = '', action = null, label = '' } = {}) {
+  const t = document.createElement('div');
+  t.className = 'toast ' + tone;
+  t.innerHTML = `<span>${msg}</span>${action ? `<button class="toast-act">${label}</button>` : ''}`;
+  if (action) t.querySelector('button').addEventListener('click', () => { action(); t.remove(); });
+  const box = $('#toasts'); box.append(t);
+  const all = $$('.toast', box); if (all.length > 3) all[0].remove();
+  setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 320); }, action ? 5200 : 3400);
+}
+function burst(el) {
+  if (reduced() || !el || !el.getBoundingClientRect) return;
+  const r = el.getBoundingClientRect(), hiddenEl = !r.width && !r.height;
+  const cx = hiddenEl ? innerWidth / 2 : r.left + r.width / 2, cy = hiddenEl ? innerHeight / 2 : r.top + r.height / 2;
+  for (let i = 0; i < 18; i++) {
+    const s = document.createElement('span'); s.className = 'burst';
+    const ang = Math.random() * Math.PI * 2, dist = rand(50, 130);
+    s.style.cssText = `left:${cx}px;top:${cy}px;background:var(--f${1 + (i % 6)});--dx:${Math.cos(ang) * dist}px;--dy:${Math.sin(ang) * dist}px`;
+    document.body.append(s); setTimeout(() => s.remove(), 900);
+  }
+}
+function openModal(html, label) {
+  UI.lastFocus = document.activeElement;
+  $('#modalBody').innerHTML = html;
+  $('#modal .modal-card').setAttribute('aria-label', label);
+  $('#modal').hidden = false;
+  $('.modal-x').focus();
+}
+function closeModal() {
+  if ($('#modal').hidden) return;
+  $('#modal').hidden = true; $('#modalBody').innerHTML = '';
+  if (UI.lastFocus && UI.lastFocus.isConnected) UI.lastFocus.focus();
+}
+function proModal() {
+  if (S.me.pro) {
+    return `<div class="pro"><h2>You're on Pro</h2><p class="price">$7.99 a month · demo, nothing is charged</p>
+      <p class="muted" style="margin-bottom:16px">Canceling takes one tap, right here. No survey, no phone call, no “are you sure” maze.</p>
+      <button class="btn ghost block" data-act="cancelPro">Cancel Pro</button></div>`;
+  }
+  const perks = ['Keep 100% of tips you receive, instead of 92%', 'Double clout from every daily drop', 'Save your own algorithm presets', 'A Pro tag next to your name', 'Cancel in one tap, on this screen'];
+  return `<div class="pro"><span class="eyebrow">BenSocial Pro</span><h2>More clout. Keep every tip.</h2><p class="price">$7.99 a month after a 7-day free trial</p>
+    <ul>${perks.map(x => `<li>${ic('check')}<span>${x}</span></li>`).join('')}</ul>
+    <button class="btn block" data-act="startPro">Start free trial</button>
+    <p class="fine" style="margin-top:10px;text-align:center">Demo mode: no card needed and nothing is charged.</p></div>`;
+}
+function receiptHTML(p) {
+  const versions = [...p.edits, { text: p.text, at: p.editedAt || p.at }];
+  const u = author(p);
+  return `<div class="receipt">
+    <p class="r-title">BENSOCIAL<br>EDIT RECEIPT</p>
+    <p class="r-meta">POST ${esc(p.id.toUpperCase())} · @${esc(u.handle.toUpperCase())}</p>
+    <hr>
+    ${versions.map((v, i) => `<div class="r-ver ${i < versions.length - 1 ? 'old' : ''}"><div class="r-row"><span>V${i + 1} ${i === 0 ? 'ORIGINAL' : ''}${i === versions.length - 1 ? 'CURRENT' : ''}</span><span>${stamp(v.at)}</span></div><p>${esc(v.text)}</p></div><hr>`).join('')}
+    <p class="r-foot">${versions.length - 1} EDIT${versions.length - 1 === 1 ? '' : 'S'} · EVERY VERSION IS PUBLIC<br>THANK YOU FOR READING CAREFULLY</p>
+  </div>`;
+}
+
+/* ---------- actions ---------- */
+function go(v) {
+  if (!VIEWS[v]) v = 'feed';
+  S.view = v; UI.pop = null;
+  try { history.replaceState(null, '', '#' + v); } catch (e) { /* sandboxed */ }
+  render(true);
+  window.scrollTo({ top: 0 });
+  save();
+}
+function react(id, kind) {
+  const p = postById(id); if (!p) return;
+  if (p.react === kind) { p.react = null; p[kind === 'like' ? 'likes' : 'dislikes']--; }
+  else {
+    if (p.react) p[p.react === 'like' ? 'likes' : 'dislikes']--;
+    p.react = kind; p[kind === 'like' ? 'likes' : 'dislikes']++;
+    if (kind === 'like') { gainXP(2); p.mom += 0.002; }
+  }
+  rerenderPost(id); commit();
+}
+
+const ACTIONS = {
+  go: (_, v) => go(v),
+  tab: (_, t) => { S.tab = t; UI.pop = null; render(); save(); },
+  compose: () => { if (S.view !== 'feed') go('feed'); const ta = $('#composeText'); if (ta) { ta.focus(); ta.scrollIntoView({ block: 'center', behavior: reduced() ? 'auto' : 'smooth' }); } },
+  mood: (_, m, el) => { UI.mood = UI.mood === m ? null : m; $$('[data-act="mood"]').forEach(b => b.setAttribute('aria-pressed', b.dataset.arg === UI.mood)); },
+  like: id => react(id, 'like'),
+  dislike: id => react(id, 'dislike'),
+  repost: id => {
+    const p = postById(id); p.reposted = !p.reposted; p.reposts += p.reposted ? 1 : -1;
+    if (p.reposted) { gainXP(3); toast('Reposted to your followers.'); }
+    rerenderPost(id); commit();
+  },
+  reply: id => { UI.open.has(id) ? UI.open.delete(id) : UI.open.add(id); rerenderPost(id); const i = $(`#reply-${id}`); if (i) i.focus(); },
+  why: id => { UI.why.has(id) ? UI.why.delete(id) : UI.why.add(id); rerenderPost(id); },
+  pop: (id, kind) => {
+    const was = UI.pop && UI.pop.id === id && UI.pop.kind === kind;
+    const prev = UI.pop && UI.pop.id;
+    UI.pop = was ? null : { id, kind };
+    if (S.view === 'feed' || S.view === 'profile') { if (prev && prev !== id) rerenderPost(prev); rerenderPost(id); }
+  },
+  tip: (id, amt) => {
+    amt = +amt; const p = postById(id), u = author(p);
+    if (S.me.cash < amt) { toast(`You need ${money(amt)} and have ${money(S.me.cash)}.`, { action: () => ACTIONS.addFunds(), label: 'Add $5' }); return; }
+    S.me.cash -= amt; p.tips += amt * (1 - TIP_FEE); p.tippers++; p.mom += 0.01;
+    ledger(`Tip to @${u.handle}`, -amt);
+    S.stats.tips++; gainXP(15); UI.pop = null;
+    toast(`Sent ${money(amt)} to ${esc(u.name)}. They get ${money(amt * (1 - TIP_FEE))}.`, { tone: 'accent' });
+    rerenderPost(id); commit();
+  },
+  back: (id, amt, el) => {
+    amt = +amt; const p = postById(id);
+    if (S.me.clout < amt) { toast(`You need ${amt} clout. Open your daily drop or post to earn more.`); return; }
+    const shares = amt / p.price;
+    const h = S.holdings[id] || (S.holdings[id] = { shares: 0, cost: 0 });
+    h.shares += shares; h.cost += amt; S.me.clout -= amt; p.mom += 0.004;
+    S.stats.backs++; gainXP(10);
+    toast(`Backed @${esc(author(p).handle)} with ${amt} clout. ${shares.toFixed(2)} shares at ${p.price.toFixed(1)}.`);
+    burst(el);
+    if (S.view === 'market') render(); else { UI.pop = null; rerenderPost(id); }
+    commit();
+  },
+  sell: id => {
+    const p = postById(id), h = S.holdings[id]; if (!p || !h) return;
+    const val = h.shares * p.price, pl = val - h.cost;
+    S.me.clout += val; delete S.holdings[id];
+    toast(`Cashed out ${fmt(val)} clout. ${pl >= 0 ? 'Profit' : 'Loss'}: ${pl >= 0 ? '+' : '−'}${fmt(Math.abs(pl))}.`, { tone: pl >= 0 ? 'accent' : '' });
+    if (pl > 0) gainXP(Math.min(40, Math.round(pl / 5)));
+    render(); commit();
+  },
+  follow: by => {
+    const i = S.follows.indexOf(by);
+    if (i >= 0) S.follows.splice(i, 1); else { S.follows.push(by); gainXP(3); toast(`Following @${esc(USERS[by].handle)}.`); }
+    $$('[data-post]').forEach(el => { const p = postById(el.dataset.post); if (p && p.by === by) rerenderPost(p.id); });
+    commit();
+  },
+  mute: by => {
+    if (!S.muted.includes(by)) S.muted.push(by);
+    toast(`Hid @${esc(USERS[by].handle)}. Undo any time in Your algorithm.`, { action: () => ACTIONS.unmute(by), label: 'Undo' });
+    render(); commit();
+  },
+  unmute: by => { S.muted = S.muted.filter(x => x !== by); render(); commit(); },
+  less: (_, k) => {
+    S.dial[k] = Math.max(0, S.dial[k] - 20); S.stats.tuned++;
+    toast(`${FACTORS.find(F => F.k === k).label} weight is now ${S.dial[k]}%. Feed re-ranked.`);
+    if (S.view === 'feed') { S.tab = 'foryou'; render(); } commit();
+  },
+  receipts: id => openModal(receiptHTML(postById(id)), 'Edit receipt'),
+  edit: id => { UI.editing = id; rerenderPost(id); const t = $(`#edit-${id}`); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } },
+  cancelEdit: () => { const id = UI.editing; UI.editing = null; if (id) rerenderPost(id); },
+  poll: (id, i) => {
+    const p = postById(id); if (!p.poll || p.poll.mine != null) return;
+    p.poll.mine = +i; p.poll.opts[+i].v++; gainXP(3); rerenderPost(id); commit();
+  },
+  vote: (id, side) => {
+    const d = S.duels.find(x => x.id === id); if (!d || d.vote) return;
+    d.vote = side; d[side].v++; S.stats.votes++; gainXP(5);
+    const lead = d[side].v >= d[side === 'a' ? 'b' : 'a'].v;
+    toast(lead ? 'Your side is ahead. Check back before it ends.' : 'Your side is behind for now. Check back before it ends.');
+    render(); commit();
+  },
+  drop: (_, __, el) => {
+    if (!dropReady()) return;
+    const amt = randi(40, 160) * (S.me.pro ? 2 : 1);
+    S.me.clout += amt; S.me.dropDay = dayKey(); gainXP(20);
+    burst(el);
+    toast(`Daily drop: +${amt} clout${S.me.pro ? ' (doubled by Pro)' : ''}. Next one tomorrow.`, { tone: 'accent' });
+    render(); commit();
+  },
+  preset: (_, k) => { Object.assign(S.dial, PRESETS[k]); S.stats.tuned++; render(); commit(); toast(`${PRESETS[k].label} preset applied.`); },
+  myPreset: (_, i) => { const pr = S.myPresets[+i]; if (!pr) return; FACTORS.forEach(F => S.dial[F.k] = pr[F.k]); render(); commit(); },
+  savePreset: () => {
+    if (!S.me.pro) { openModal(proModal(), 'BenSocial Pro'); return; }
+    const pr = { label: 'My mix ' + (S.myPresets.length + 1) }; FACTORS.forEach(F => pr[F.k] = S.dial[F.k]);
+    S.myPresets.push(pr); toast(`Saved “${pr.label}”.`); render(); commit();
+  },
+  pro: () => openModal(proModal(), 'BenSocial Pro'),
+  startPro: () => { S.me.pro = true; closeModal(); toast('Pro is on. Your daily drop is doubled.', { tone: 'accent' }); buildShell(); render(); commit(); },
+  cancelPro: () => { S.me.pro = false; closeModal(); toast('Pro canceled. That was it. One tap.'); buildShell(); render(); commit(); },
+  close: () => closeModal(),
+  cashout: () => {
+    if (S.me.cash < 500) { toast(`Cash-out opens at $5.00. You have ${money(S.me.cash)}. Raise your attention price or keep scrolling.`); return; }
+    toast('Demo mode: no real money moves. In the live app this goes to your bank in 1–2 days.');
+  },
+  addFunds: () => { S.me.cash += 500; ledger('Added funds (demo)', 500); toast('Added $5.00 of demo money.'); if (S.view === 'wallet') render(); commit(); },
+  showNew: () => {
+    S.posts.unshift(...UI.incoming); UI.incoming = []; S.posts = S.posts.slice(0, 60);
+    renderPill(); renderFeed(); save();
+    const f = $('#feedList'); if (f) f.scrollIntoView({ behavior: reduced() ? 'auto' : 'smooth', block: 'start' });
+  },
+  dismissWelcome: () => { S.welcomed = true; const w = $('.welcome'); if (w) w.remove(); save(); },
+  theme: () => {
+    const dark = themeLabel() === 'Switch to light';
+    S.theme = dark ? 'light' : 'dark';
+    document.documentElement.dataset.theme = S.theme;
+    renderChrome(); if (S.view === 'profile') render(); save();
+  },
+  reset: () => {
+    if (!UI.resetArmed) { UI.resetArmed = true; render(); setTimeout(() => { if (UI.resetArmed) { UI.resetArmed = false; if (S.view === 'profile') render(); } }, 4000); return; }
+    UI.resetArmed = false;
+    try { localStorage.removeItem(KEY); } catch (e) { /* storage unavailable */ }
+    S = seed(); touchStreak(); UI.seenAds.clear(); UI.incoming = [];
+    document.documentElement.removeAttribute('data-theme');
+    buildShell(); go('feed'); toast('Demo reset.');
+  },
+  editProfile: () => { UI.editProfile = !UI.editProfile; render(); if (UI.editProfile) $('#pf-name').focus(); },
+};
+
+/* ---------- events ---------- */
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (el) {
+    const fn = ACTIONS[el.dataset.act];
+    if (fn) { e.preventDefault(); fn(el.dataset.id, el.dataset.arg, el); }
+    return;
+  }
+  if (e.target === $('#modal')) closeModal();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (!$('#modal').hidden) closeModal();
+    else if (UI.pop) { const id = UI.pop.id; UI.pop = null; rerenderPost(id); }
+    else if (UI.editing) ACTIONS.cancelEdit();
+  }
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.id === 'composeText') { S.draft = t.value; $('#composeCount').textContent = t.value.length + '/500'; save(); }
+  else if (t.dataset.dial) {
+    S.dial[t.dataset.dial] = +t.value; S.stats.tuned++;
+    $(`#out-${t.dataset.dial}`).textContent = t.value + '%';
+    $('#formula').innerHTML = formulaHTML();
+    $('#dialPreview').innerHTML = previewHTML();
+    $$('[data-act="preset"]').forEach(b => b.setAttribute('aria-pressed', matches(PRESETS[b.dataset.arg])));
+    $$('[data-act="myPreset"]').forEach(b => b.setAttribute('aria-pressed', matches(S.myPresets[+b.dataset.arg])));
+    commit();
+  } else if (t.id === 'adPrice') {
+    S.adPrice = +t.value;
+    $('#priceOut').textContent = S.adPrice + '¢';
+    $('#priceSummary').innerHTML = priceSummary(eligibleAds());
+    $('#bidRows').innerHTML = bidRows();
+    save();
+  }
+});
+document.addEventListener('submit', e => {
+  const f = e.target, kind = f.dataset.form; if (!kind) return;
+  e.preventDefault();
+  const text = (f.elements.t ? f.elements.t.value : '').trim();
+  if (kind === 'compose') {
+    if (!text) { toast('Write something first.'); $('#composeText').focus(); return; }
+    const mood = UI.mood;
+    const p = mkPost({ id: 'm' + Date.now().toString(36), by: 'me', mins: 0, text,
+      spicy: mood === 'spicy' ? .8 : mood === 'wholesome' ? .05 : .25,
+      wholesome: mood === 'wholesome' ? .85 : mood === 'spicy' ? .1 : .35, mom: .045 }, Date.now());
+    p.price = 5; p.hist = Array(HIST).fill(5);
+    S.posts.unshift(p); S.draft = ''; UI.mood = null; S.stats.posts++;
+    gainXP(25);
+    toast('Posted. +25 XP. Your post is now trading on the Clout Market.', { tone: 'accent' });
+    render(); commit();
+    const el = $(`[data-post="${p.id}"]`); if (el) el.classList.add('flash');
+  } else if (kind === 'reply') {
+    if (!text) return;
+    const p = postById(f.dataset.id);
+    p.thread.push({ by: 'me', text, at: Date.now() }); p.replies++; gainXP(8);
+    rerenderPost(p.id); commit();
+    const i = $(`#reply-${p.id}`); if (i) i.focus();
+  } else if (kind === 'edit') {
+    const p = postById(f.dataset.id);
+    if (text && text !== p.text) {
+      p.edits.push({ text: p.text, at: p.editedAt || p.at });
+      p.text = text; p.editedAt = Date.now();
+      toast('Edit saved. The earlier version is on the public receipt.', { action: () => ACTIONS.receipts(p.id), label: 'View receipt' });
+    }
+    UI.editing = null; rerenderPost(p.id); commit();
+  } else if (kind === 'profile') {
+    const name = f.elements.name.value.trim(), handle = f.elements.handle.value.trim().replace(/^@/, '');
+    if (!name || !/^[A-Za-z0-9._]+$/.test(handle)) { toast('Handles can use letters, numbers, dots and underscores.'); return; }
+    S.me.name = name; S.me.handle = handle; UI.editProfile = false;
+    buildShell(); render(); commit(); toast('Profile saved.');
+  }
+});
+
+/* ---------- simulation: the world keeps moving ---------- */
+let ticks = 0;
+function tick() {
+  ticks++;
+  for (const p of S.posts) {
+    p.mom = clamp(p.mom * 0.99 + rand(-0.003, 0.003) + (Math.random() < 0.015 ? 0.03 : 0), -0.03, 0.06);
+    p.price = Math.max(1, +(p.price * (1 + p.mom * 0.3 + rand(-0.012, 0.012))).toFixed(2));
+    p.hist.push(p.price); if (p.hist.length > HIST) p.hist.shift();
+    const heat = Math.max(0, p.mom) * 60 + 0.4;
+    if (Math.random() < 0.55) {
+      const add = randi(0, Math.ceil(heat * (1 + p.likes / 2000)));
+      p.likes += add;
+      if (p.by === 'me' && add > 0 && Math.random() < 0.35) {
+        const u = USERS[pick(Object.keys(USERS))];
+        note(`<b>@${esc(u.handle)}</b> liked your post “${esc(short(p.text, 40))}”`);
+        if (Math.random() < 0.4) toast(`@${esc(u.handle)} liked your post`);
+      }
+    }
+    if (Math.random() < p.spicy * 0.5) p.dislikes += randi(0, Math.ceil(heat * p.spicy * (1 + p.dislikes / 2000)));
+    if (Math.random() < 0.12) p.replies++;
+    if (Math.random() < 0.07) p.reposts++;
+  }
+  for (const d of S.duels) {
+    if (d.endsAt <= Date.now()) { if (!d.settled) settle(d); continue; }
+    d.a.v += randi(0, 4); d.b.v += randi(0, 4);
+  }
+  if (ticks % 6 === 0) simEvent();
+  if (ticks % 60 === 0) { refreshDuels(); if (S.view === 'duels') render(); }
+  if (ticks % 13 === 0 && UI.incoming.length < 5) {
+    const src = INCOMING[S.incomingIx++ % INCOMING.length];
+    const p = mkPost({ ...src, id: 'n' + Date.now().toString(36), mins: 0, likes: randi(2, 40), dislikes: randi(0, Math.round(src.spicy * 20)), mom: .03 }, Date.now());
+    UI.incoming.unshift(p); renderPill();
+  }
+  patch();
+  if (ticks % 2 === 0) renderLive();
+  if (ticks % 5 === 0) renderTicker();
+  save();
+}
+function simEvent() {
+  const mine = S.posts.filter(p => p.by === 'me');
+  const held = Object.keys(S.holdings).map(postById).filter(Boolean);
+  const votedDuel = S.duels.find(d => d.vote && d.endsAt > Date.now());
+  const u = USERS[pick(Object.keys(USERS))];
+  const options = [() => { S.me.followers++; return `<b>@${esc(u.handle)}</b> started following you`; }];
+  if (mine.length) options.push(() => { const p = pick(mine); const amt = pick([25, 50, 100]); p.mom += 0.006; return `<b>@${esc(u.handle)}</b> backed your post with ${amt} clout`; });
+  if (held.length) options.push(() => { const p = pick(held), h = S.holdings[p.id]; const r = h.shares * p.price / h.cost - 1; return `Your position in <b>@${esc(author(p).handle)}</b>'s post is <span class="${r >= 0 ? 'up' : 'down'}">${r >= 0 ? 'up' : 'down'} ${Math.abs(r * 100).toFixed(1)}%</span>`; });
+  if (votedDuel) options.push(() => { const d = votedDuel; const lead = d[d.vote].v >= d[d.vote === 'a' ? 'b' : 'a'].v; return `Your side in “${esc(d.title)}” is ${lead ? 'ahead' : 'behind'}`; });
+  options.push(() => { const a = pick(ADS); return `<b>${esc(a.brand)}</b> bid ${cents(a.bid)} for your attention${a.bid >= S.adPrice ? '' : ', below your price'}`; });
+  note(pick(options)());
+  renderChrome();
+  if (S.view === 'activity') render();
+}
+function patch() {
+  const byId = new Map(S.posts.map(p => [p.id, p]));
+  $$('[data-b]').forEach(el => {
+    const [f, id] = el.dataset.b.split(':');
+    if (f === 'pf') {
+      const pf = portfolio();
+      if (id === 'value') el.textContent = fmt(pf.value);
+      else { el.textContent = (pf.pl >= 0 ? '+' : '−') + fmt(Math.abs(pf.pl)); el.className = pf.pl >= 0 ? 'up' : 'down'; }
+      return;
+    }
+    if (f === 'dvt' || f === 'dsa' || f === 'dsb' || f === 'left') {
+      const d = S.duels.find(x => x.id === id); if (!d) return;
+      const tot = d.a.v + d.b.v, sa = tot ? Math.round(d.a.v / tot * 100) : 50;
+      if (f === 'dvt') el.textContent = fmt(tot);
+      else if (f === 'left') el.textContent = timeLeft(d);
+      else { const v = f === 'dsa' ? sa : 100 - sa; el.textContent = v + '%'; el.style.flexBasis = v + '%'; }
+      return;
+    }
+    const p = byId.get(id); if (!p) return;
+    switch (f) {
+      case 'likes': el.textContent = fmt(p.likes); break;
+      case 'dislikes': el.textContent = fmt(p.dislikes); break;
+      case 'replies': el.textContent = fmt(p.replies); break;
+      case 'reposts': el.textContent = fmt(p.reposts); break;
+      case 'price': el.textContent = p.price.toFixed(1); break;
+      case 'chg': { const c = chg(p); el.textContent = pct(c); el.className = c >= 0 ? 'up' : 'down'; break; }
+      case 'hv': case 'hpl': {
+        const h = S.holdings[id]; if (!h) return;
+        const val = h.shares * p.price, pl = val - h.cost;
+        if (f === 'hv') el.textContent = fmt(val);
+        else { el.textContent = (pl >= 0 ? '+' : '−') + fmt(Math.abs(pl)); el.className = pl >= 0 ? 'up' : 'down'; }
+        break;
+      }
+    }
+  });
+  $$('[data-spark]').forEach(el => { const p = byId.get(el.dataset.spark); if (p) el.innerHTML = spark(p.hist); });
+  $$('time[data-at]').forEach(el => { el.textContent = ago(+el.dataset.at); });
+  renderChrome();
+}
+
+/* ---------- boot ---------- */
+function refreshDuels() {
+  const now = Date.now(), active = new Set(S.duels.map(x => x.base || x.id));
+  S.duels = S.duels.map(d => {
+    if (d.endsAt <= now && !d.settled) settle(d);
+    if (d.endsAt > now - 30 * 6e4) return d;
+    const next = DUEL_POOL.find(x => !active.has(x.id)) || pick(DUEL_POOL);
+    active.add(next.id);
+    return mkDuel(next, now, true);
+  });
+}
+if (S.theme) document.documentElement.dataset.theme = S.theme;
+touchStreak();
+refreshDuels();
+const hash = (location.hash || '').slice(1);
+if (VIEWS[hash]) S.view = hash;
+buildShell();
+render();
+renderTicker();
+checkBadges(); renderChrome(); save();
+setInterval(tick, TICK_MS);
+addEventListener('hashchange', () => { const h = location.hash.slice(1); if (VIEWS[h] && h !== S.view) go(h); });
+matchMedia('(max-width:1180px)').addEventListener('change', renderLive);
+})();
+</script>
+</body>
+</html>
