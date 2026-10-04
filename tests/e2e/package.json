@@ -1,0 +1,13 @@
+{
+  "name": "bensocial-e2e",
+  "private": true,
+  "description": "Live-mode end-to-end tests for BenSocial. See README.md.",
+  "license": "UNLICENSED",
+  "scripts": {
+    "test": "./run.sh"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.117.2",
+    "pg": "8.13.1"
+  }
+}

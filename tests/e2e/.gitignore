@@ -1,0 +1,5 @@
+# Installed by run.sh (npm ci) and downloaded on first run (PostgREST).
+node_modules/
+.bin/
+# Failure screenshots.
+.artifacts/
